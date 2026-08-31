@@ -5,8 +5,12 @@ info:
     API for customer management (CRUD). A Customer extends Person and adds
     credentials and status.
 
+    Persistence uses JOINED inheritance: `customer.id` is both the primary key
+    and a foreign key to `person.id`, so a customer row and its person row
+    always share the same identifier and are written in a single transaction.
+
     This service is consumed internally over REST by the Account/Movement
-    microservice to: (1) validate that a customerId exists when creating an
+    microservice to: (1) validate that a customer id exists when creating an
     account, and (2) fetch customer data when generating the account
     statement report.
   version: 1.0.0
@@ -35,7 +39,7 @@ paths:
         - $ref: '#/components/parameters/SizeParam'
         - name: status
           in: query
-          description: Filter by customer status
+          description: Filter by customer status. Omit to return every customer.
           schema:
             type: boolean
       responses:
@@ -52,6 +56,9 @@ paths:
     post:
       tags: [Customers]
       summary: Create a new customer
+      description: >
+        Inserts the person row and the customer row in a single transaction.
+        The identifier is generated server-side as a UUID.
       operationId: createCustomer
       requestBody:
         required: true
@@ -62,6 +69,13 @@ paths:
       responses:
         '201':
           description: Customer created successfully
+          headers:
+            Location:
+              description: URI of the newly created customer
+              schema:
+                type: string
+                format: uri
+                example: "/api/v1/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6"
           content:
             application/json:
               schema:
@@ -78,7 +92,7 @@ paths:
       - name: customerId
         in: path
         required: true
-        description: Unique customer identifier
+        description: Unique customer identifier (same value as the person identifier)
         schema:
           type: string
           format: uuid
@@ -103,6 +117,9 @@ paths:
     put:
       tags: [Customers]
       summary: Update a customer (full replacement)
+      description: >
+        Replaces every writable field. The identifier and `createdAt` are never
+        modified; `updatedAt` is refreshed by the server.
       operationId: updateCustomer
       requestBody:
         required: true
@@ -121,11 +138,16 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
     patch:
       tags: [Customers]
       summary: Partially update a customer
+      description: >
+        Only the fields present in the body are modified. A field sent as
+        `null` is ignored, not cleared.
       operationId: patchCustomer
       requestBody:
         required: true
@@ -140,13 +162,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
     delete:
       tags: [Customers]
       summary: Delete a customer
+      description: >
+        Removes the customer row and its person row (ON DELETE CASCADE).
       operationId: deleteCustomer
       responses:
         '204':
@@ -154,7 +182,10 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: The customer cannot be deleted because it has active accounts
+          description: >
+            The customer cannot be deleted because it has active accounts.
+            NOT IMPLEMENTED YET - requires the Account/Movement microservice
+            to be reachable for the ownership check.
           content:
             application/json:
               schema:
@@ -196,7 +227,9 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     Conflict:
-      description: Conflict with the current state of the resource
+      description: >
+        Conflict with the current state of the resource, typically a duplicated
+        `identification` (unique constraint uq_person_identification)
       content:
         application/json:
           schema:
@@ -211,28 +244,38 @@ components:
             $ref: '#/components/schemas/Error'
 
   schemas:
+    Gender:
+      type: string
+      description: Biological sex recorded for the person
+      enum: [MALE, FEMALE, OTHER]
+      example: "MALE"
+
     Person:
       type: object
+      description: Fields stored in the `person` table, shared by every person-like subtype.
       properties:
         name:
           type: string
+          maxLength: 150
           example: "Jose Lema"
         gender:
-          type: string
-          enum: [MALE, FEMALE, OTHER]
-        age:
-          type: integer
-          minimum: 0
-          example: 35
+          allOf:
+            - $ref: '#/components/schemas/Gender'
+          nullable: true
         identification:
           type: string
-          description: National ID, tax ID, or passport
+          maxLength: 20
+          description: National ID, tax ID, or passport. Unique across all persons.
           example: "0102030405"
         address:
           type: string
+          nullable: true
+          maxLength: 255
           example: "Otavalo sn y principal"
         phone:
           type: string
+          nullable: true
+          maxLength: 20
           example: "098254785"
       required:
         - name
@@ -242,16 +285,18 @@ components:
       allOf:
         - $ref: '#/components/schemas/Person'
         - type: object
+          description: Fields stored in the `customer` table.
           properties:
             password:
               type: string
               format: password
               writeOnly: true
+              maxLength: 255
               example: "1234"
             status:
               type: boolean
               default: true
-              description: Whether the customer is active
+              description: Whether the customer is active. Defaults to true when omitted.
           required:
             - password
 
@@ -265,22 +310,27 @@ components:
 
     CustomerPatch:
       type: object
+      description: Every field is optional. Absent fields keep their current value.
       properties:
         name:
           type: string
+          maxLength: 150
         gender:
+          $ref: '#/components/schemas/Gender'
+        identification:
           type: string
-          enum: [MALE, FEMALE, OTHER]
-        age:
-          type: integer
+          maxLength: 20
         address:
           type: string
+          maxLength: 255
         phone:
           type: string
+          maxLength: 20
         password:
           type: string
           format: password
           writeOnly: true
+          maxLength: 255
         status:
           type: boolean
 
@@ -289,12 +339,15 @@ components:
         - $ref: '#/components/schemas/Person'
         - type: object
           properties:
-            customerId:
+            id:
               type: string
               format: uuid
               readOnly: true
+              description: Identifier shared by the person and customer rows
+              example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
             status:
               type: boolean
+              example: true
             createdAt:
               type: string
               format: date-time
@@ -304,7 +357,10 @@ components:
               format: date-time
               readOnly: true
           required:
-            - customerId
+            - id
+            - status
+            - createdAt
+            - updatedAt
 
     CustomerPage:
       type: object
@@ -315,12 +371,25 @@ components:
             $ref: '#/components/schemas/Customer'
         page:
           type: integer
+          description: Current page number (starts at 0)
+          example: 0
         size:
           type: integer
+          description: Requested page size
+          example: 20
         totalElements:
           type: integer
+          format: int64
+          example: 137
         totalPages:
           type: integer
+          example: 7
+      required:
+        - content
+        - page
+        - size
+        - totalElements
+        - totalPages
 
     Error:
       type: object

@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface JpaCustomerRepository  {
+public interface JpaCustomerRepository extends JpaRepository<CustomerEntity, String> {
 
+    Optional<CustomerEntity> findByIdentification(String identification);
+
+    boolean existsByIdentification(String identification);
 }

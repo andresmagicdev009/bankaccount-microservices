@@ -30,6 +30,7 @@
 		<java.version>17</java.version>
 		<org.mapstruct.version>1.6.3</org.mapstruct.version>
 		<lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+		<openapi-generator.version>7.11.0</openapi-generator.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -136,6 +137,42 @@
 						<arg>-Amapstruct.unmappedTargetPolicy=IGNORE</arg>
 					</compilerArgs>
 				</configuration>
+			</plugin>
+			<!-- Contract First: the OpenAPI spec is the source of truth.
+			     Generates the API interfaces and DTOs into target/generated-sources. -->
+			<plugin>
+				<groupId>org.openapitools</groupId>
+				<artifactId>openapi-generator-maven-plugin</artifactId>
+				<version>${openapi-generator.version}</version>
+				<executions>
+					<execution>
+						<id>generate-customer-api</id>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<inputSpec>${project.basedir}/src/main/resources/openapi/customer_openapi.yaml</inputSpec>
+							<generatorName>spring</generatorName>
+							<library>spring-boot</library>
+							<apiPackage>com.example.customerms.interfaces.rest.api</apiPackage>
+							<modelPackage>com.example.customerms.interfaces.rest.dto</modelPackage>
+							<modelNameSuffix>Dto</modelNameSuffix>
+							<generateSupportingFiles>false</generateSupportingFiles>
+							<configOptions>
+								<reactive>true</reactive>
+								<interfaceOnly>true</interfaceOnly>
+								<useSpringBoot3>true</useSpringBoot3>
+								<useTags>true</useTags>
+								<skipDefaultInterface>true</skipDefaultInterface>
+								<openApiNullable>false</openApiNullable>
+								<useBeanValidation>true</useBeanValidation>
+								<performBeanValidation>true</performBeanValidation>
+								<documentationProvider>springdoc</documentationProvider>
+								<serializableModel>true</serializableModel>
+							</configOptions>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
