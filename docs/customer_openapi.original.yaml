@@ -1,0 +1,346 @@
+openapi: 3.0.3
+info:
+  title: Customer Microservice
+  description: >
+    API for customer management (CRUD). A Customer extends Person and adds
+    credentials and status.
+
+    This service is consumed internally over REST by the Account/Movement
+    microservice to: (1) validate that a customerId exists when creating an
+    account, and (2) fetch customer data when generating the account
+    statement report.
+  version: 1.0.0
+  contact:
+    name: Backend
+servers:
+  - url: https://api.mycompany.com/api/v1
+    description: Production
+  - url: https://api-staging.mycompany.com/api/v1
+    description: "Staging (pre-production testing environment)"
+  - url: http://localhost:8081/api/v1
+    description: "Local / inside the Docker network (container hostname: ms-customers)"
+
+tags:
+  - name: Customers
+    description: CRUD operations over customers
+
+paths:
+  /customers:
+    get:
+      tags: [Customers]
+      summary: List customers
+      operationId: listCustomers
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: status
+          in: query
+          description: Filter by customer status
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Customers]
+      summary: Create a new customer
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '201':
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /customers/{customerId}:
+    parameters:
+      - name: customerId
+        in: path
+        required: true
+        description: Unique customer identifier
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Customers]
+      summary: Get a customer by ID
+      description: >
+        Also used internally by the Account/Movement microservice to
+        validate customers and build the account statement report.
+      operationId: getCustomer
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Customers]
+      summary: Update a customer (full replacement)
+      operationId: updateCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Customer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Customers]
+      summary: Partially update a customer
+      operationId: patchCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerPatch'
+      responses:
+        '200':
+          description: Customer partially updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Customers]
+      summary: Delete a customer
+      operationId: deleteCustomer
+      responses:
+        '204':
+          description: Customer deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The customer cannot be deleted because it has active accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (starts at 0)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Conflict with the current state of the resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: >
+        Unexpected server error, caught by the global exception handler
+        (@RestControllerAdvice)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Person:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Jose Lema"
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        age:
+          type: integer
+          minimum: 0
+          example: 35
+        identification:
+          type: string
+          description: National ID, tax ID, or passport
+          example: "0102030405"
+        address:
+          type: string
+          example: "Otavalo sn y principal"
+        phone:
+          type: string
+          example: "098254785"
+      required:
+        - name
+        - identification
+
+    CustomerBase:
+      allOf:
+        - $ref: '#/components/schemas/Person'
+        - type: object
+          properties:
+            password:
+              type: string
+              format: password
+              writeOnly: true
+              example: "1234"
+            status:
+              type: boolean
+              default: true
+              description: Whether the customer is active
+          required:
+            - password
+
+    CustomerCreate:
+      allOf:
+        - $ref: '#/components/schemas/CustomerBase'
+
+    CustomerUpdate:
+      allOf:
+        - $ref: '#/components/schemas/CustomerBase'
+
+    CustomerPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        age:
+          type: integer
+        address:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+          format: password
+          writeOnly: true
+        status:
+          type: boolean
+
+    Customer:
+      allOf:
+        - $ref: '#/components/schemas/Person'
+        - type: object
+          properties:
+            customerId:
+              type: string
+              format: uuid
+              readOnly: true
+            status:
+              type: boolean
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+            updatedAt:
+              type: string
+              format: date-time
+              readOnly: true
+          required:
+            - customerId
+
+    CustomerPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    Error:
+      type: object
+      description: Standardized error body, generated by the global @RestControllerAdvice
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Field 'name' is required"
+        path:
+          type: string
+          example: "/api/v1/customers"
+      required:
+        - status
+        - message

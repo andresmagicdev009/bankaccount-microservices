@@ -1,0 +1,411 @@
+openapi: 3.0.3
+info:
+  title: Customer Microservice
+  description: >
+    API for customer management (CRUD). A Customer extends Person and adds
+    credentials and status.
+
+    Persistence uses JOINED inheritance: `customer.id` is both the primary key
+    and a foreign key to `person.id`, so a customer row and its person row
+    always share the same identifier and are written in a single transaction.
+
+    This service is consumed internally over REST by the Account/Movement
+    microservice to: (1) validate that a customer id exists when creating an
+    account, and (2) fetch customer data when generating the account
+    statement report.
+  version: 1.0.0
+  contact:
+    name: Backend
+servers:
+  - url: https://api.mycompany.com/api/v1
+    description: Production
+  - url: https://api-staging.mycompany.com/api/v1
+    description: "Staging (pre-production testing environment)"
+  - url: http://localhost:8081/api/v1
+    description: "Local / inside the Docker network (container hostname: ms-customers)"
+
+tags:
+  - name: Customers
+    description: CRUD operations over customers
+
+paths:
+  /customers:
+    get:
+      tags: [Customers]
+      summary: List customers
+      operationId: listCustomers
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: status
+          in: query
+          description: Filter by customer status. Omit to return every customer.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Customers]
+      summary: Create a new customer
+      description: >
+        Inserts the person row and the customer row in a single transaction.
+        The identifier is generated server-side as a UUID.
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '201':
+          description: Customer created successfully
+          headers:
+            Location:
+              description: URI of the newly created customer
+              schema:
+                type: string
+                format: uri
+                example: "/api/v1/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /customers/{customerId}:
+    parameters:
+      - name: customerId
+        in: path
+        required: true
+        description: Unique customer identifier (same value as the person identifier)
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Customers]
+      summary: Get a customer by ID
+      description: >
+        Also used internally by the Account/Movement microservice to
+        validate customers and build the account statement report.
+      operationId: getCustomer
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Customers]
+      summary: Update a customer (full replacement)
+      description: >
+        Replaces every writable field. The identifier and `createdAt` are never
+        modified; `updatedAt` is refreshed by the server.
+      operationId: updateCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Customer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Customers]
+      summary: Partially update a customer
+      description: >
+        Only the fields present in the body are modified. A field sent as
+        `null` is ignored, not cleared.
+      operationId: patchCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerPatch'
+      responses:
+        '200':
+          description: Customer partially updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Customers]
+      summary: Delete a customer
+      description: >
+        Removes the customer row and its person row (ON DELETE CASCADE).
+      operationId: deleteCustomer
+      responses:
+        '204':
+          description: Customer deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >
+            The customer cannot be deleted because it has active accounts.
+            NOT IMPLEMENTED YET - requires the Account/Movement microservice
+            to be reachable for the ownership check.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (starts at 0)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: >
+        Conflict with the current state of the resource, typically a duplicated
+        `identification` (unique constraint uq_person_identification)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: >
+        Unexpected server error, caught by the global exception handler
+        (@RestControllerAdvice)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Person:
+      type: object
+      description: Fields stored in the `person` table, shared by every person-like subtype.
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          example: "Jose Lema"
+        gender:
+          type: string
+          nullable: true
+          enum: [MALE, FEMALE, OTHER]
+          example: "MALE"
+        identification:
+          type: string
+          maxLength: 20
+          description: National ID, tax ID, or passport. Unique across all persons.
+          example: "0102030405"
+        address:
+          type: string
+          nullable: true
+          maxLength: 255
+          example: "Otavalo sn y principal"
+        phone:
+          type: string
+          nullable: true
+          maxLength: 20
+          example: "098254785"
+      required:
+        - name
+        - identification
+
+    CustomerBase:
+      allOf:
+        - $ref: '#/components/schemas/Person'
+        - type: object
+          description: Fields stored in the `customer` table.
+          properties:
+            password:
+              type: string
+              format: password
+              writeOnly: true
+              maxLength: 255
+              example: "1234"
+            status:
+              type: boolean
+              default: true
+              description: Whether the customer is active. Defaults to true when omitted.
+          required:
+            - password
+
+    CustomerCreate:
+      allOf:
+        - $ref: '#/components/schemas/CustomerBase'
+
+    CustomerUpdate:
+      allOf:
+        - $ref: '#/components/schemas/CustomerBase'
+
+    CustomerPatch:
+      type: object
+      description: Every field is optional. Absent fields keep their current value.
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        identification:
+          type: string
+          maxLength: 20
+        address:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 20
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          maxLength: 255
+        status:
+          type: boolean
+
+    Customer:
+      allOf:
+        - $ref: '#/components/schemas/Person'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              readOnly: true
+              description: Identifier shared by the person and customer rows
+              example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            status:
+              type: boolean
+              example: true
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+            updatedAt:
+              type: string
+              format: date-time
+              readOnly: true
+          required:
+            - id
+            - status
+            - createdAt
+            - updatedAt
+
+    CustomerPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        page:
+          type: integer
+          description: Current page number (starts at 0)
+          example: 0
+        size:
+          type: integer
+          description: Requested page size
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 137
+        totalPages:
+          type: integer
+          example: 7
+      required:
+        - content
+        - page
+        - size
+        - totalElements
+        - totalPages
+
+    Error:
+      type: object
+      description: Standardized error body, generated by the global @RestControllerAdvice
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Field 'name' is required"
+        path:
+          type: string
+          example: "/api/v1/customers"
+      required:
+        - status
+        - message
