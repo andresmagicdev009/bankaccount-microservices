@@ -11,6 +11,9 @@ import com.example.customerms.infrastructure.persistence.jpa.mapper.CustomerPers
 import com.example.customerms.infrastructure.persistence.jpa.repository.JpaCustomerRepository;
 
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -62,4 +65,14 @@ public class CustomerRepositoryAdapter implements CustomerRepositoryPort {
         }
         jpaRepository.deleteById(id);
     }
+
+    @Override 
+    public Page<Customer> findAll(Boolean status, Pageable pageable) {
+        Page<CustomerEntity> page = (status == null) 
+        
+                ? jpaRepository.findAll(pageable) 
+                : jpaRepository.findByStatus(status, pageable); 
+        return page.map(mapper::toDomain);
+    }
+
 }
