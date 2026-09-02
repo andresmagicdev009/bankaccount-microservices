@@ -1,0 +1,51 @@
+-- =====================================================================
+-- PASO 2.9 - Esquema inicial (Flyway).
+--
+-- Importante: application.properties tiene spring.jpa.hibernate.ddl-auto=validate,
+-- o sea que Hibernate NO crea tablas. Si esta migracion no coincide exactamente
+-- con tus @Entity, la aplicacion no arranca. Ese es el objetivo: la base la
+-- gobierna Flyway, no Hibernate.
+--
+-- Convencion de nombres: la migracion ya se llama V1__init_schema.sql; la
+-- siguiente seria V2__loQueSea.sql. Una vez aplicada, NUNCA edites una version
+-- existente: crea una nueva.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- TODO 1: tabla account
+--   account_number     VARCHAR(20)    NOT NULL   -> PK natural (no autoincremental)
+--   account_type       ENUM('SAVINGS','CHECKING') NOT NULL
+--   initial_balance    DECIMAL(19,2)  NOT NULL DEFAULT 0.00
+--   available_balance  DECIMAL(19,2)  NOT NULL DEFAULT 0.00
+--   status             BOOLEAN        NOT NULL DEFAULT TRUE
+--   customer_id        CHAR(36)       NOT NULL
+--   created_at         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP
+--   updated_at         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP
+--                                     ON UPDATE CURRENT_TIMESTAMP
+--   PRIMARY KEY (account_number)
+--   indice por customer_id (lo consultan el listado filtrado y el reporte)
+--
+--   OJO: customer_id NO lleva FOREIGN KEY. El cliente vive en la base de datos
+--   del otro microservicio; la integridad se valida por REST, no por la BD.
+--   Poner una FK aqui seria acoplar dos bases que deben ser independientes.
+-- ---------------------------------------------------------------------
+
+
+-- ---------------------------------------------------------------------
+-- TODO 2: tabla movement
+--   movement_id     CHAR(36)       NOT NULL   -> PK (UUID en texto)
+--   movement_date   DATETIME       NOT NULL   -> "date" es palabra reservada
+--   movement_type   ENUM('DEBIT','CREDIT') NOT NULL
+--   value           DECIMAL(19,2)  NOT NULL
+--   balance         DECIMAL(19,2)  NOT NULL   -> saldo despues del movimiento
+--   account_number  VARCHAR(20)    NOT NULL
+--   PRIMARY KEY (movement_id)
+--   indice (account_number, movement_date) -> es como consulta el reporte
+--   FOREIGN KEY account_number -> account(account_number)
+--       aqui SI va FK: ambas tablas viven en esta misma base.
+--       Decide ON DELETE CASCADE o borrado explicito en el adaptador, pero
+--       que sea coherente con lo que programes en AccountRepositoryAdapter.
+--
+--   Usa DECIMAL, nunca DOUBLE/FLOAT para dinero: el binario flotante no
+--   representa exacto valores como 0.10 y los saldos terminan descuadrados.
+-- ---------------------------------------------------------------------

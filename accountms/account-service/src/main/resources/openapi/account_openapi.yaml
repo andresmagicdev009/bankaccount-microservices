@@ -1,0 +1,795 @@
+openapi: 3.0.3
+info:
+  title: Account/Movement Microservice
+  description: >
+    API for account and movement management (CRUD), plus account statement
+    report generation.
+
+    Inter-service communication: this service calls the Customer
+    microservice over REST (GET /api/v1/customers/{customerId}) in two
+    cases:
+      1. When creating an account, to validate that the customerId exists.
+      2. When generating the account statement report, to retrieve the
+         customer's data (name, identification) included in the response.
+    The Customer microservice's base URL is injected via configuration
+    (e.g. CUSTOMERS_SERVICE_URL environment variable); inside Docker it
+    resolves through the service name on the internal network
+    (ms-customers).
+
+    Business rules for movements (F2/F3):
+      - A movement's value must be strictly greater than zero.
+      - A DEBIT movement is subtracted from the account's available balance.
+      - A CREDIT movement is added to the account's available balance.
+      - Every transaction performed must be persisted.
+      - If a DEBIT would leave the balance below zero, the request is
+        rejected with a 422 response whose message is exactly
+        "Saldo no disponible" (business requirement, kept verbatim).
+  version: 1.0.0
+  contact:
+    name: Backend
+servers:
+  - url: https://api.mycompany.com/api/v1
+    description: Production
+  - url: https://api-staging.mycompany.com/api/v1
+    description: "Staging (pre-production testing environment)"
+  - url: http://localhost:8082/api/v1
+    description: "Local / inside the Docker network (container hostname: ms-accounts)"
+
+tags:
+  - name: Accounts
+    description: CRUD operations over bank accounts
+  - name: Movements
+    description: CRUD operations over account movements
+  - name: Reports
+    description: Account statement report generation
+
+paths:
+  # =========================================================
+  # ACCOUNTS
+  # =========================================================
+  /accounts:
+    get:
+      tags: [Accounts]
+      summary: List accounts
+      operationId: listAccounts
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: customerId
+          in: query
+          description: Filter accounts by customer
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountPage'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Accounts]
+      summary: Create a new account
+      description: >
+        Before creating the account, this endpoint internally calls
+        GET /api/v1/customers/{customerId} on the Customer microservice to
+        validate that the customer exists. If that call fails or the
+        service does not respond, a 502 is returned (see responses).
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreate'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: The associated customer does not exist (validated against the Customer microservice)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /accounts/{accountNumber}:
+    parameters:
+      - name: accountNumber
+        in: path
+        required: true
+        description: Unique account number
+        schema:
+          type: string
+    get:
+      tags: [Accounts]
+      summary: Get an account by number
+      operationId: getAccount
+      responses:
+        '200':
+          description: Account found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Accounts]
+      summary: Update an account (full replacement)
+      operationId: updateAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountUpdate'
+      responses:
+        '200':
+          description: Account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Accounts]
+      summary: Partially update an account
+      operationId: patchAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountPatch'
+      responses:
+        '200':
+          description: Account partially updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Accounts]
+      summary: Delete an account
+      operationId: deleteAccount
+      responses:
+        '204':
+          description: Account deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The account cannot be deleted because its balance is not zero
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # =========================================================
+  # MOVEMENTS
+  # =========================================================
+  /movements:
+    get:
+      tags: [Movements]
+      summary: List movements
+      operationId: listMovements
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: accountNumber
+          in: query
+          description: Filter movements by account number
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          description: >
+            Filter movements by owning customer (resolved through the
+            customer's accounts). Supports listing movements by customer
+            and date range.
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          description: Range start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          description: Range end date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of movements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementPage'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Movements]
+      summary: Register a new movement (debit or credit)
+      description: >
+        Validates that `value` is strictly greater than zero. For a DEBIT
+        movement, the value is subtracted from the account's available
+        balance; if the resulting balance would be negative, the request
+        is rejected with 422 and message "Saldo no disponible". For a
+        CREDIT movement, the value is added to the available balance.
+        Every movement is persisted as a transaction record, regardless
+        of type.
+      operationId: createMovement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementCreate'
+      responses:
+        '201':
+          description: Movement registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '400':
+          description: Invalid request (e.g. value is not greater than zero)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The associated account does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Insufficient balance to perform the movement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                timestamp: "2026-08-30T10:15:00Z"
+                status: 422
+                error: "Unprocessable Entity"
+                message: "Saldo no disponible"
+                path: "/api/v1/movements"
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /movements/{movementId}:
+    parameters:
+      - name: movementId
+        in: path
+        required: true
+        description: Unique movement identifier
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Movements]
+      summary: Get a movement by ID
+      operationId: getMovement
+      responses:
+        '200':
+          description: Movement found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Movements]
+      summary: Update a movement (full replacement)
+      operationId: updateMovement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementUpdate'
+      responses:
+        '200':
+          description: Movement updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Movements]
+      summary: Partially update a movement
+      operationId: patchMovement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementPatch'
+      responses:
+        '200':
+          description: Movement partially updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Movements]
+      summary: Delete (reverse) a movement
+      operationId: deleteMovement
+      responses:
+        '204':
+          description: Movement deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # =========================================================
+  # REPORTS
+  # (Resolves to /api/v1/reports/{client-id}; the /api/v1 prefix comes
+  #  from the server base URL, consistent with the other endpoints)
+  # =========================================================
+  /reports/{client-id}:
+    parameters:
+      - name: client-id
+        in: path
+        required: true
+        description: Unique customer identifier
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Reports]
+      summary: Generate account statement report
+      description: >
+        Returns a customer's account statement for a date range, including
+        the associated accounts with their balances and the detail of
+        movements per account. Output format (JSON or Excel) is chosen via
+        the `Accept` header or the `format` query parameter.
+
+        Internally, this endpoint combines: (a) accounts and movements data
+        owned by this service, and (b) customer data fetched over REST from
+        the Customer microservice (GET /api/v1/customers/{customerId}).
+      operationId: generateAccountStatementReport
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          description: Range start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: "2026-01-01"
+        - name: endDate
+          in: query
+          required: true
+          description: Range end date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: "2026-01-31"
+        - name: format
+          in: query
+          required: false
+          description: >
+            Desired output format. If not provided, the `Accept` header is
+            used to decide the format; defaults to JSON.
+          schema:
+            type: string
+            enum: [json, excel]
+            default: json
+      responses:
+        '200':
+          description: Report generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountStatementReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+                description: Excel (.xlsx) file with the account statement
+        '400':
+          description: Invalid date range (startDate after endDate, malformed date, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: >
+            The customer does not exist (per the Customer microservice) or
+            has no associated accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (starts at 0)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UpstreamError:
+      description: >
+        The Customer microservice did not respond or responded with an
+        error when invoked internally (timeout, connection refused, 5xx)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: >
+        Unexpected server error, caught by the global exception handler
+        (@RestControllerAdvice)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ---------- Account ----------
+    AccountCreate:
+      type: object
+      properties:
+        accountType:
+          type: string
+          enum: [SAVINGS, CHECKING]
+        initialBalance:
+          type: number
+          format: double
+          minimum: 0
+          example: 500.00
+        status:
+          type: boolean
+          default: true
+        customerId:
+          type: string
+          format: uuid
+          description: Validated over REST against the Customer microservice
+      required:
+        - accountType
+        - initialBalance
+        - customerId
+
+    AccountUpdate:
+      type: object
+      properties:
+        accountType:
+          type: string
+          enum: [SAVINGS, CHECKING]
+        status:
+          type: boolean
+        customerId:
+          type: string
+          format: uuid
+      required:
+        - accountType
+        - customerId
+
+    AccountPatch:
+      type: object
+      properties:
+        accountType:
+          type: string
+          enum: [SAVINGS, CHECKING]
+        status:
+          type: boolean
+
+    Account:
+      type: object
+      properties:
+        accountNumber:
+          type: string
+          readOnly: true
+          example: "478758"
+        accountType:
+          type: string
+          enum: [SAVINGS, CHECKING]
+        initialBalance:
+          type: number
+          format: double
+        availableBalance:
+          type: number
+          format: double
+          readOnly: true
+          description: Current balance after applying all movements
+        status:
+          type: boolean
+        customerId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - accountNumber
+        - accountType
+        - customerId
+
+    AccountPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    # ---------- Movement ----------
+    MovementCreate:
+      type: object
+      properties:
+        accountNumber:
+          type: string
+          example: "478758"
+        movementType:
+          type: string
+          enum: [DEBIT, CREDIT]
+        value:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          description: Movement amount; must be strictly greater than zero
+          example: 150.00
+      required:
+        - accountNumber
+        - movementType
+        - value
+
+    MovementUpdate:
+      type: object
+      properties:
+        movementType:
+          type: string
+          enum: [DEBIT, CREDIT]
+        value:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+      required:
+        - movementType
+        - value
+
+    MovementPatch:
+      type: object
+      properties:
+        movementType:
+          type: string
+          enum: [DEBIT, CREDIT]
+        value:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+
+    Movement:
+      type: object
+      properties:
+        movementId:
+          type: string
+          format: uuid
+          readOnly: true
+        date:
+          type: string
+          format: date-time
+          readOnly: true
+        movementType:
+          type: string
+          enum: [DEBIT, CREDIT]
+        value:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+          description: Account balance after applying this movement
+          readOnly: true
+        accountNumber:
+          type: string
+      required:
+        - movementId
+        - date
+        - movementType
+        - value
+        - balance
+        - accountNumber
+
+    MovementPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Movement'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    # ---------- Report ----------
+    MovementDetail:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        movementType:
+          type: string
+          enum: [DEBIT, CREDIT]
+        value:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+
+    AccountReport:
+      type: object
+      properties:
+        accountNumber:
+          type: string
+        accountType:
+          type: string
+          enum: [SAVINGS, CHECKING]
+        initialBalance:
+          type: number
+          format: double
+        availableBalance:
+          type: number
+          format: double
+        status:
+          type: boolean
+        movements:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovementDetail'
+
+    AccountStatementReport:
+      type: object
+      properties:
+        customer:
+          type: object
+          description: Fetched over REST from the Customer microservice
+          properties:
+            customerId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            identification:
+              type: string
+        range:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date
+            endDate:
+              type: string
+              format: date
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountReport'
+
+    # ---------- Error ----------
+    Error:
+      type: object
+      description: Standardized error body, generated by the global @RestControllerAdvice
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 422
+        error:
+          type: string
+          example: "Unprocessable Entity"
+        message:
+          type: string
+          description: >
+            Human-readable error message. For insufficient balance this is
+            the literal, verbatim business-required text "Saldo no disponible".
+          example: "Saldo no disponible"
+        path:
+          type: string
+          example: "/api/v1/movements"
+      required:
+        - status
+        - message
