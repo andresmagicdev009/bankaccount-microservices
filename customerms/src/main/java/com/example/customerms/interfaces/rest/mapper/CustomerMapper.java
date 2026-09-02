@@ -4,14 +4,17 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.example.customerms.domain.customer.entity.Customer;
 import com.example.customerms.domain.person.entity.Gender;
 import com.example.customerms.interfaces.rest.dto.CustomerCreateDto;
 import com.example.customerms.interfaces.rest.dto.CustomerDto;
+import com.example.customerms.interfaces.rest.dto.CustomerPageDto;
 import com.example.customerms.interfaces.rest.dto.CustomerUpdateDto;
 import com.example.customerms.interfaces.rest.dto.GenderDto;
 
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 /**
@@ -76,5 +79,15 @@ public class CustomerMapper {
     /** The database stores naive timestamps; the contract exposes them as UTC. */
     private OffsetDateTime toOffsetDateTime(LocalDateTime timestamp) {
         return timestamp == null ? null : timestamp.atOffset(ZoneOffset.UTC);
+    }
+
+    public CustomerPageDto toPageDto(Page<Customer> page){
+        CustomerPageDto dto = new CustomerPageDto();
+        dto.setContent(page.getContent().stream().map(this::toDto).collect(Collectors.toList()));
+        dto.setPage(page.getNumber());
+        dto.setSize(page.getSize());
+        dto.setTotalElements(page.getTotalElements());
+        dto.setTotalPages(page.getTotalPages());
+        return dto;
     }
 }

@@ -69,7 +69,6 @@ public class CustomerRepositoryAdapter implements CustomerRepositoryPort {
     @Override 
     public Page<Customer> findAll(Boolean status, Pageable pageable) {
         Page<CustomerEntity> page = (status == null) 
-        
                 ? jpaRepository.findAll(pageable) 
                 : jpaRepository.findByStatus(status, pageable); 
         return page.map(mapper::toDomain);

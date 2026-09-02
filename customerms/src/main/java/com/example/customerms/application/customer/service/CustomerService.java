@@ -3,6 +3,7 @@ package com.example.customerms.application.customer.service;
 import com.example.customerms.domain.customer.entity.Customer;
 import com.example.customerms.domain.customer.exception.CustomerNotFoundException;
 import com.example.customerms.domain.customer.exception.DuplicateIdentificationException;
+import com.example.customerms.domain.customer.exception.InvalidaPageSizeException;
 import com.example.customerms.domain.customer.repository.CustomerRepositoryPort;
 import com.example.customerms.interfaces.rest.dto.CustomerPatchDto;
 
@@ -10,8 +11,9 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -54,8 +56,16 @@ public class CustomerService {
     }
 
     // This methos works to find all customers
-    public List<Customer> findAll() {
-        return repository.findAll();
+    public Page<Customer> findAll(Integer page, Integer size, Boolean status) {
+        int pageNumber = (page == null || page < 0) ? 0: page;
+
+        // Utilizar excepciones para validar el tamaño de la página
+        if (size != null && (size < 1 || size > 100)) {
+            throw new InvalidaPageSizeException(size, "Invalid page size.");
+        }
+        int pageSize = (size == null) ? 20: size;
+        Pageable pageable = PageRequest.of(pageNumber, pageSize);
+        return repository.findAll(status, pageable);
     }
 
     // This method works to delete a customer, if not found, it throws an exception

@@ -1,8 +1,6 @@
 package com.example.customerms.interfaces.rest.controller;
 
 import com.example.customerms.application.customer.service.CustomerService;
-import com.example.customerms.domain.customer.entity.Customer;
-import com.example.customerms.domain.customer.exception.CustomerNotFoundException;
 import com.example.customerms.interfaces.rest.api.CustomersApi;
 import com.example.customerms.interfaces.rest.dto.CustomerCreateDto;
 import com.example.customerms.interfaces.rest.dto.CustomerDto;
@@ -90,33 +88,12 @@ public class CustomerController implements CustomersApi {
     @Override
     public Mono<ResponseEntity<CustomerPageDto>> listCustomers(Integer page, Integer size, Boolean status,
             ServerWebExchange exchange) {
-        // This one needs work below the controller before it can be wired up:
-        //
-        // TODO 1: CustomerRepositoryPort only exposes findAll() with no pagination and
-        // no status
-        // filter. Add a paged read to the port, e.g.
-        // Page<Customer> findAll(Boolean status, Pageable pageable), and implement it
-        // in
-        // CustomerRepositoryAdapter over JpaCustomerRepository (findAll(Pageable) is
-        // inherited; the status filter needs findByStatus(Boolean, Pageable)).
-        // TODO 2: add CustomerService.findAll(page, size, status) that builds the
-        // PageRequest.of(page, size) and delegates to the port. Keep it blocking, like
-        // create/findById.
-        // TODO 3: the generated params are nullable even though the contract declares
-        // defaults
-        // (page=0, size=20). Decide whether to default them here or let the generator
-        // do
-        // it, and clamp size to the contract range (1..100) so a caller cannot ask for
-        // the whole table.
-        // TODO 4: add CustomerMapper.toPageDto(Page<Customer>) filling content, page,
-        // size,
-        // totalElements (int64) and totalPages - all five are required by CustomerPage.
-        // TODO 5: same reactive shape as createCustomer: Mono.fromCallable(...)
-        // .subscribeOn(jdbcScheduler).map(mapper::toPageDto).map(ResponseEntity::ok)
-        // TODO 6: the contract declares a 400 for invalid paging values; that needs the
-        // same
-        // @RestControllerAdvice as the 404 on getCustomer.
-        return Mono.error(new UnsupportedOperationException("Not implemented yet"));
+        
+        return Mono.fromCallable(() -> service.findAll(page, size, status))
+            .subscribeOn(jdbcScheduler)
+            .map(mapper::toPageDto)
+            .map(ResponseEntity::ok);
+
     }
 
     // Partially updated customer, only the fields that are present in the request
