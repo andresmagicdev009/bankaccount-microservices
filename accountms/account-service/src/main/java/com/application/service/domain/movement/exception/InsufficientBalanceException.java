@@ -1,16 +1,19 @@
 package com.application.service.domain.movement.exception;
 
+import com.application.service.domain.shared.constant.ErrorCode;
+import com.application.service.domain.shared.exception.BusinessRuleException;
+
 /**
  * PASO 1.12 - Regla de negocio F3: saldo insuficiente -> 422.
  *
- * OJO: el enunciado exige que el mensaje sea EXACTAMENTE "Saldo no disponible".
- * No lo traduzcas ni le agregues detalles.
- *
- * TODO 1: extiende RuntimeException.
- * TODO 2: declara public static final String MESSAGE = "Saldo no disponible";
- * TODO 3: constructor sin argumentos que haga super(MESSAGE).
- *         Tener la constante evita que el texto se escriba a mano en el advice.
+ * El mensaje que llega al cliente es EXACTAMENTE "Saldo no disponible": lo
+ * define ErrorCode.INSUFFICIENT_BALANCE y no lleva argumentos. Si necesitas el
+ * detalle (saldo disponible vs. solicitado) para depurar, va en el log del
+ * MovementService, nunca en el cuerpo de la respuesta.
  */
-public class InsufficientBalanceException {
+public class InsufficientBalanceException extends BusinessRuleException {
 
+    public InsufficientBalanceException() {
+        super(ErrorCode.INSUFFICIENT_BALANCE);
+    }
 }

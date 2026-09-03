@@ -9,5 +9,5 @@ package com.application.service.domain.account.entity;
  */
 public enum AccountType {
     // TODO: SAVINGS, CHECKING
-    PENDIENTE
+    SAVINGS, CHECKING
 }

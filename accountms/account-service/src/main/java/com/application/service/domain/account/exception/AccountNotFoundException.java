@@ -1,12 +1,12 @@
 package com.application.service.domain.account.exception;
 
-/**
- * PASO 1.9 - Cuenta inexistente. El advice la traduce a 404.
- *
- * TODO: extiende RuntimeException y agrega un constructor que reciba el
- *       accountNumber y arme el mensaje, p.ej.
- *       super("Account not found with number: " + accountNumber);
- */
-public class AccountNotFoundException {
+import com.application.service.domain.shared.constant.ErrorCode;
+import com.application.service.domain.shared.exception.ResourceNotFoundException;
 
+/** PASO 1.9 - Cuenta inexistente -> 404. */
+public class AccountNotFoundException extends ResourceNotFoundException {
+
+    public AccountNotFoundException(String accountNumber) {
+        super(ErrorCode.ACCOUNT_NOT_FOUND, "accountNumber", accountNumber);
+    }
 }

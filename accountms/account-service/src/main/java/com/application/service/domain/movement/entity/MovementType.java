@@ -1,5 +1,7 @@
 package com.application.service.domain.movement.entity;
 
+import java.math.BigDecimal;
+
 /**
  * PASO 1.3 - Tipos de movimiento.
  *
@@ -13,5 +15,9 @@ package com.application.service.domain.movement.entity;
  */
 public enum MovementType {
     // TODO: DEBIT, CREDIT
-    PENDIENTE
+    DEBIT, CREDIT;
+
+    public BigDecimal signed(BigDecimal value){
+        return this == DEBIT ? value.negate() : value;
+    }
 }

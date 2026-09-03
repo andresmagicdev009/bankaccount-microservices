@@ -1,5 +1,9 @@
 package com.application.service.domain.customer.port;
 
+import java.util.Optional;
+
+import com.application.service.domain.customer.entity.CustomerSnapshot;
+
 /**
  * PASO 1.8 - Puerto de salida hacia el microservicio de clientes.
  *
@@ -15,5 +19,5 @@ package com.application.service.domain.customer.port;
  *       Esa distincion es la que despues se traduce a 404 vs 502.
  */
 public interface CustomerLookupPort {
-
+    Optional<CustomerSnapshot> findById(String customerId);
 }
