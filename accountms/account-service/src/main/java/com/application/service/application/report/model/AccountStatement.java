@@ -1,5 +1,16 @@
 package com.application.service.application.report.model;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+import com.application.service.domain.account.entity.Account;
+import com.application.service.domain.customer.entity.CustomerSnapshot;
+import com.application.service.domain.movement.entity.Movement;
+
+import lombok.Builder;
+import lombok.Getter;
+
 /**
  * PASO 5.4 - Resultado del caso de uso del reporte.
  *
@@ -14,6 +25,13 @@ package com.application.service.application.report.model;
  *       List<Account> accounts
  *       Map<String, List<Movement>> movementsByAccount  -> clave: numero de cuenta
  */
-public class AccountStatement {
 
+@Getter
+@Builder
+public class AccountStatement {
+    private final CustomerSnapshot customer;
+    private final LocalDate startDate;
+    private final LocalDate endDate;
+    private final List<Account> accounts;
+    private final Map<String, List<Movement>> movementsByAccount;
 }
