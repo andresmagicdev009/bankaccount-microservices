@@ -39,7 +39,6 @@ public class AccountPersistenceMapper {
                 .accountNumber(entity.getAccountNumber())
                 .accountType(entity.getAccountType())
                 .initialBalance(entity.getInitialBalance())
-                .availableBalance(entity.getAvailableBalance())
                 .status(entity.getStatus())
                 .customerId(entity.getCustomerId())
                 .createdAt(entity.getCreatedAt())
@@ -51,7 +50,6 @@ public class AccountPersistenceMapper {
     private void copyState(AccountEntity entity, Account account) {
         entity.setAccountType(account.getAccountType());
         entity.setInitialBalance(account.getInitialBalance());
-        entity.setAvailableBalance(account.getAvailableBalance());
         entity.setStatus(account.getStatus());
         entity.setCustomerId(account.getCustomerId());
     }

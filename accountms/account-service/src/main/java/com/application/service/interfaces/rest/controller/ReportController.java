@@ -26,30 +26,6 @@ import reactor.core.scheduler.Scheduler;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-public class ReportController implements ReportsApi {
+public class ReportController {
 
-    private final ReportService service;
-    private final ReportMapper mapper;
-    private final Scheduler jdbcScheduler;
-
-    /**
-     * El parametro format solo admite json en esta version: el contrato declara
-     * tambien excel, pero el generador tipa la respuesta como
-     * AccountStatementReportDto, asi que el binario necesitaria un metodo aparte.
-     * Se registra el valor recibido para dejar constancia de la peticion.
-     */
-    @Override
-    public Mono<ResponseEntity<AccountStatementReportDto>> generateAccountStatementReport(UUID clientId,
-            LocalDate startDate, LocalDate endDate, String format, ServerWebExchange exchange) {
-        String customerId = clientId.toString();
-
-        if (format != null && !"json".equalsIgnoreCase(format)) {
-            log.warn("Requested report format '{}' is not supported yet, returning JSON", format);
-        }
-
-        return Mono.fromCallable(() -> service.generate(customerId, startDate, endDate))
-                .subscribeOn(jdbcScheduler)
-                .map(mapper::toDto)
-                .map(ResponseEntity::ok);
-    }
 }

@@ -15,22 +15,19 @@ import lombok.Setter;
  * Regla de oro de esta capa: NO puede importar nada de Spring, JPA, Jackson ni
  * de los DTOs generados. Es un POJO puro con las reglas del negocio.
  *
- * TODO 1: declara los campos
- *         accountNumber (String)      -> numero de cuenta, lo asigna AccountService
- *         accountType (AccountType)
- *         initialBalance (BigDecimal) -> dinero SIEMPRE en BigDecimal, nunca double
- *         availableBalance (BigDecimal)
- *         status (Boolean)
- *         customerId (String)         -> id del cliente que vive en el otro microservicio
- *         createdAt / updatedAt (LocalDateTime)
+ * Los campos son los cuatro que pide el enunciado -numero, tipo, saldo inicial,
+ * estado- mas el customerId que exige la separacion en microservicios y las
+ * marcas de auditoria.
  *
- * TODO 2: anota la clase con Lombok
- *         @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
+ * El saldo disponible NO esta aqui y no es un olvido: el enunciado lo modela
+ * como el campo "saldo" de cada movimiento (el saldo resultante despues de
+ * aplicarlo). El caso 5 del documento lo confirma: la cuenta 225487 conserva
+ * saldo inicial 100 mientras su saldo disponible pasa a 700. Un saldo guardado
+ * tambien en la cuenta seria un segundo origen de la verdad que podria quedar
+ * descuadrado respecto a la tabla movement.
  *
- * TODO 3: metodo de negocio hasBalance()
- *         devuelve true si availableBalance es distinto de cero.
- *         AccountService lo usa para rechazar el DELETE con 409.
- *         Compara con compareTo(BigDecimal.ZERO), nunca con equals().
+ * Quien necesita el saldo disponible lo recibe aparte: AccountView en la capa
+ * de aplicacion, o el mapa de AccountStatement en el reporte.
  */
 @Getter
 @Setter
@@ -41,19 +38,8 @@ public class Account {
     private String accountNumber;
     private AccountType accountType;
     private BigDecimal initialBalance;
-    private BigDecimal availableBalance;
     private Boolean status;
     private String customerId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    /**
-     * true si la cuenta tiene saldo distinto de cero. Lo usa el DELETE para
-     * responder 409. compareTo y no equals: para BigDecimal, equals compara
-     * tambien la escala, asi que 0.00 no seria "igual" a ZERO.
-     */
-    public boolean hasBalance() {
-        return availableBalance != null
-                && availableBalance.compareTo(BigDecimal.ZERO) != 0;
-    }
 }

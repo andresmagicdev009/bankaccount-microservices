@@ -34,6 +34,19 @@ public class MovementMapper {
                 .build();
     }
 
+    /**
+     * PUT: solo viajan movementType y value. accountNumber, date y balance no
+     * estan en el contrato de update -mover un movimiento de cuenta o reescribir
+     * su fecha descuadraria el saldo historico-, asi que el Movement sale con
+     * esos campos en null y MovementService conserva los del existente.
+     */
+    public Movement toDomain(MovementUpdateDto dto) {
+        return Movement.builder()
+                .movementType(toDomainType(dto.getMovementType()))
+                .value(DtoTypes.toAmount(dto.getValue()))
+                .build();
+    }
+
     public MovementType toDomainType(MovementCreateDto.MovementTypeEnum movementType) {
         return DtoTypes.toDomainEnum(MovementType.class, movementType);
     }

@@ -1,5 +1,6 @@
 package com.application.service.infrastructure.persistence.jpa.adapter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +63,20 @@ public class MovementRepositoryAdapter implements MovementRepositoryPort {
                 .findByAccountNumberAndDateBetweenOrderByDateAsc(accountNumber, from, to).stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<BigDecimal> findLatestBalance(String accountNumber) {
+        return movementRepository
+                .findFirstByAccountNumberOrderByDateDescMovementIdDesc(accountNumber)
+                .map(MovementEntity::getBalance);
+    }
+
+    @Override
+    public Optional<Movement> findLatest(String accountNumber) {
+        return movementRepository
+                .findFirstByAccountNumberOrderByDateDescMovementIdDesc(accountNumber)
+                .map(mapper::toDomain);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.application.service.domain.movement.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,24 @@ public interface MovementRepositoryPort {
 
     List<Movement> findByAccountAndRange(String accountNumber,
             LocalDateTime from, LocalDateTime to);
+
+    /**
+     * Saldo resultante del ultimo movimiento de la cuenta, o vacio si todavia no
+     * tiene ninguno -en ese caso el saldo disponible es el saldo inicial-.
+     *
+     * Esta es la unica fuente del saldo disponible: el enunciado lo modela como
+     * el campo "saldo" del movimiento, no como una columna de account.
+     */
+    Optional<BigDecimal> findLatestBalance(String accountNumber);
+
+    /**
+     * Ultimo movimiento de la cuenta, o vacio si todavia no tiene ninguno.
+     *
+     * Lo usa MovementService para permitir editar o borrar solo el ultimo:
+     * findLatestBalance devuelve el saldo pero no el id, y para esa regla hace
+     * falta el id.
+     */
+    Optional<Movement> findLatest(String accountNumber);
 
     void deleteById(String movementId);
 }

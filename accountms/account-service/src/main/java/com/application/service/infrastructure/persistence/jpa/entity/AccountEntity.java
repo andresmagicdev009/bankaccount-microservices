@@ -44,11 +44,12 @@ public class AccountEntity {
     @Column(name = "account_type", nullable = false, length = 20)
     private AccountType accountType;
 
-    @Column(name = "initial_balance", nullable = false, precision = 19, scale = 2)
+    /**
+     * Saldo de apertura, y no se muta nunca. El saldo disponible no es columna de
+     * esta tabla: es el campo balance del ultimo movimiento de la cuenta.
+     */
+    @Column(name = "initial_balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal initialBalance;
-
-    @Column(name = "available_balance", nullable = false, precision = 19, scale = 2)
-    private BigDecimal availableBalance;
 
     @Column(name = "status", nullable = false)
     private Boolean status;

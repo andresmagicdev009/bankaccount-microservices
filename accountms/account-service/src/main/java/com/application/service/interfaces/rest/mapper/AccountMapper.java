@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
+import com.application.service.application.account.model.AccountView;
 import com.application.service.domain.account.entity.Account;
 import com.application.service.domain.account.entity.AccountType;
 import com.application.service.interfaces.rest.dto.AccountCreateDto;
@@ -18,12 +19,26 @@ import com.application.service.interfaces.rest.dto.AccountUpdateDto;
  *
  * A un lado los DTOs generados del contrato, al otro el modelo de dominio.
  * Ninguna otra clase deberia hacer esta traduccion.
+ *
+ * Mismo patron que MovementMapper: las conversiones de tipo (Double <->
+ * BigDecimal, UUID <-> String, LocalDateTime -> OffsetDateTime, enums) se
+ * delegan en DtoTypes.
  */
 @Component
-public class AccountMapper {
+public class AccountMapper  {
 
-    // ------------------------------------------------------------ entrada
+    // ----------------------------------------------------------------- ENTRADA
 
+    /**
+     * AccountCreate -> Account.
+     *
+     * TODO: Account.builder() con accountType (toDomainType), initialBalance
+     * (DtoTypes.toAmount), status y customerId (DtoTypes.toId, porque el
+     * contrato usa UUID y el dominio String).
+     *
+     * accountNumber, createdAt y updatedAt NO se mapean: son readOnly y los
+     * asigna AccountService / Hibernate.
+     */
     public Account toDomain(AccountCreateDto dto) {
         return Account.builder()
                 .accountType(toDomainType(dto.getAccountType()))
@@ -34,8 +49,10 @@ public class AccountMapper {
     }
 
     /**
-     * PUT. No mapea saldos y no es un olvido: AccountUpdate no los declara,
-     * porque el saldo solo cambia registrando movimientos.
+     * AccountUpdate -> Account con los campos que el PUT reemplaza.
+     *
+     * TODO: solo accountType, status y customerId. initialBalance queda fuera:
+     * el contrato no lo acepta en el update.
      */
     public Account toDomain(AccountUpdateDto dto) {
         return Account.builder()
@@ -46,14 +63,11 @@ public class AccountMapper {
     }
 
     /**
-     * PATCH. Se exponen los campos sueltos en vez de un objeto porque en un
-     * patch el null significa "no lo toques", y un Account a medio llenar no
-     * podria distinguir eso de "ponlo en null".
+     * Tres sobrecargas y no un solo metodo: el generador crea un enum anidado
+     * distinto por DTO y sin interfaz comun. DtoTypes.toDomainEnum acepta
+     * cualquier Enum<?>, asi que el tipo concreto se declara aqui para que el
+     * compilador siga vigilando quien llama.
      */
-    public AccountType toDomainType(AccountPatchDto dto) {
-        return DtoTypes.toDomainEnum(AccountType.class, dto.getAccountType());
-    }
-
     public AccountType toDomainType(AccountCreateDto.AccountTypeEnum accountType) {
         return DtoTypes.toDomainEnum(AccountType.class, accountType);
     }
@@ -62,21 +76,32 @@ public class AccountMapper {
         return DtoTypes.toDomainEnum(AccountType.class, accountType);
     }
 
-    // ------------------------------------------------------------- salida
+    /** En PATCH el null significa "conserva el valor actual". */
+    public AccountType toDomainType(AccountPatchDto.AccountTypeEnum accountType) {
+        return DtoTypes.toDomainEnum(AccountType.class, accountType);
+    }
 
-    public AccountDto toDto(Account account) {
+    // ------------------------------------------------------------------ SALIDA
+
+    /**
+     * Recibe AccountView y no Account porque availableBalance no vive en el
+     * dominio: lo resuelve el servicio.
+     */
+    public AccountDto toDto(AccountView view) {
+        Account account = view.account();
+
         return new AccountDto()
                 .accountNumber(account.getAccountNumber())
                 .accountType(toContractType(account.getAccountType()))
                 .initialBalance(DtoTypes.toContractAmount(account.getInitialBalance()))
-                .availableBalance(DtoTypes.toContractAmount(account.getAvailableBalance()))
+                .availableBalance(DtoTypes.toContractAmount(view.availableBalance()))
                 .status(account.getStatus())
                 .customerId(DtoTypes.toUuid(account.getCustomerId()))
                 .createdAt(DtoTypes.toContractDate(account.getCreatedAt()))
                 .updatedAt(DtoTypes.toContractDate(account.getUpdatedAt()));
     }
 
-    public AccountPageDto toPageDto(Page<Account> page) {
+    public AccountPageDto toPageDto(Page<AccountView> page) {
         List<AccountDto> content = page.getContent().stream()
                 .map(this::toDto)
                 .toList();
@@ -85,7 +110,6 @@ public class AccountMapper {
                 .content(content)
                 .page(page.getNumber())
                 .size(page.getSize())
-                // El contrato declara totalElements como integer; Page devuelve long.
                 .totalElements((int) page.getTotalElements())
                 .totalPages(page.getTotalPages());
     }

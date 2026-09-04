@@ -2,6 +2,7 @@ package com.application.service.infrastructure.persistence.jpa.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -23,6 +24,16 @@ public interface JpaMovementRepository
 
     List<MovementEntity> findByAccountNumberAndDateBetweenOrderByDateAsc(
             String accountNumber, LocalDateTime from, LocalDateTime to);
+
+    /**
+     * Ultimo movimiento de la cuenta: de el sale el saldo disponible.
+     *
+     * El desempate por movementId no es cosmetico: movement_date tiene precision
+     * de segundo, asi que dos movimientos del mismo segundo empatarian y el saldo
+     * devuelto seria no determinista.
+     */
+    Optional<MovementEntity> findFirstByAccountNumberOrderByDateDescMovementIdDesc(
+            String accountNumber);
 
     void deleteByAccountNumber(String accountNumber);
 }

@@ -27,6 +27,13 @@ public enum ErrorCode {
 
     /** args: (valorRecibido) */
     INVALID_MOVEMENT_VALUE("Movement value must be greater than zero, got: %s"),
+    /**
+     * args: (movementId, accountNumber). Solo el ultimo movimiento de una
+     * cuenta se puede editar o borrar: el balance de cada fila es historico y
+     * tocar uno intermedio descuadraria todos los posteriores.
+     */
+    MOVEMENT_NOT_LAST("Movement %s is not the last movement of account %s; only the last one can be modified or deleted"),
+
     /** args: (accountNumber) */
     BALANCE_NOT_ZERO("Account %s cannot be deleted: its balance must be zero"),
     /** args: (startDate, endDate) */
@@ -34,7 +41,7 @@ public enum ErrorCode {
     /** args: (sizeRecibido) */
     INVALID_PAGE_SIZE("Page size must be between 1 and 100, got: %s"),
     /** args: (customerId) */
-    CUSTOMER_SERVICE_UNAVAILABLE("Customer service unavailable for customer id: %s");
+    CUSTOMER_SERVICE_UNAVAILABLE("Customer service is down 😒");
 
     private final String template;
 

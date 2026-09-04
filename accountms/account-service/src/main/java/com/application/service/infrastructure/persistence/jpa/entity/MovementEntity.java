@@ -3,6 +3,8 @@ package com.application.service.infrastructure.persistence.jpa.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.CreationTimestamp;
+
 import com.application.service.domain.movement.entity.MovementType;
 
 import jakarta.persistence.Column;
@@ -29,24 +31,32 @@ import lombok.Setter;
 public class MovementEntity {
 
     @Id
-    @Column(name = "movement_id", length = 36, nullable = false, updatable = false)
+    @Column(name = "id", length = 36, nullable = false, updatable = false)
     private String movementId;
 
-    /** La columna se llama movement_date: "date" es palabra reservada en varios motores. */
-    @Column(name = "movement_date", nullable = false)
+    /** La columna en BD se llama date (ver schema.sql); el campo Java se llama date. */
+    @Column(name = "date", nullable = false)
     private LocalDateTime date;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "movement_type", nullable = false, length = 10)
     private MovementType movementType;
 
-    @Column(name = "value", nullable = false, precision = 19, scale = 2)
+    @Column(name = "value", nullable = false, precision = 15, scale = 2)
     private BigDecimal value;
 
     /** Saldo de la cuenta DESPUES de aplicar este movimiento. Dato historico congelado. */
-    @Column(name = "balance", nullable = false, precision = 19, scale = 2)
+    @Column(name = "balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal balance;
 
     @Column(name = "account_number", nullable = false, length = 20)
     private String accountNumber;
+
+    /**
+     * Auditoria: cuando se inserto la fila. No confundir con date, que es la
+     * fecha de negocio del movimiento y la puede fijar el cliente.
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 }
