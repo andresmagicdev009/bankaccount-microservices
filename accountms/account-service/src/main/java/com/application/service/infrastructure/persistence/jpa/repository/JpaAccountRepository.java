@@ -5,6 +5,8 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.application.service.infrastructure.persistence.jpa.entity.AccountEntity;
@@ -21,4 +23,12 @@ public interface JpaAccountRepository extends JpaRepository<AccountEntity, Strin
     List<AccountEntity> findByCustomerId(String customerId);
 
     Page<AccountEntity> findByCustomerId(String customerId, Pageable pageable);
+
+    @Modifying
+    @Query(value = "UPDATE account_number_seq SET next_value = LAST_INSERT_ID(next_value + 1)",
+            nativeQuery = true)
+    void advance();
+
+    @Query(value = "SELECT LAST_INSERT_ID()", nativeQuery = true)
+    long currentValue();
 }

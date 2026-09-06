@@ -1,7 +1,6 @@
 package com.application.service.application.account.service;
 
 import java.math.BigDecimal;
-import java.security.SecureRandom;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +8,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.application.service.application.account.helpers.AccountHelpers;
 import com.application.service.application.account.model.AccountView;
 import com.application.service.application.shared.PageRequestFactory;
 import com.application.service.domain.account.entity.Account;
@@ -38,14 +38,9 @@ import lombok.extern.slf4j.Slf4j;
  * movimiento. Resolverlo aqui evita que el mapper tenga que tocar repositorios.
  */
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor    
 @Slf4j
 public class AccountService {
-
-    /** 6 digitos como los ejemplos del enunciado (225487, 478758). */
-    private static final int ACCOUNT_NUMBER_DIGITS = 6;
-
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     /** Orden por defecto del listado: la mas reciente primero. */
     private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
@@ -54,11 +49,12 @@ public class AccountService {
     private final MovementRepositoryPort movementRepository;
     private final CustomerLookupPort customerLookup;
 
-
-    private static final int ACCOUNT_NUMBER_ORIGIN = 100_000;
-    private static final int ACCOUNT_NUMBER_BOUND = 1_000_000;
-    private static final int MAX_GENERATION_ATTEMPTS = 10;
-    
+    /**
+     * Colaborador, no clase padre. AccountService no ES un AccountHelpers: solo
+     * le pide numeros de cuenta. Heredarlo ademas romperia
+     * @RequiredArgsConstructor, que solo sabe emitir el super() vacio.
+     */
+    private final AccountHelpers accountHelpers;
 
     // ------------------------------------------------------------------ CREATE
 
@@ -70,7 +66,7 @@ public class AccountService {
      * vacio -> CustomerNotFoundException (404). Si el otro microservicio no
      * responde, el puerto ya lanza CustomerServiceUnavailableException (502),
      * no lo captures aqui.
-     * 2. asignar accountNumber con generateAccountNumber() (el contrato lo marca
+     * 2. asignar accountNumber con accountHelpers.nextAccountNumber() (el contrato lo marca
      * readOnly: si viene en el body se ignora).
      * 3. status null -> true por defecto.
      * 4. guardar y devolver toView(guardada). Recien creada no tiene
@@ -78,21 +74,17 @@ public class AccountService {
      */
     @Transactional
     public AccountView create(Account account) {
-
-
         CustomerSnapshot customer = customerLookup.findById(account.getCustomerId())
                 .orElseThrow(() -> new CustomerNotFoundException(account.getCustomerId()));
-        
         Account newAccount = Account.builder()
-                .accountNumber(generateAccountNumber())
+                .accountNumber(accountHelpers.nextAccountNumber())
                 .accountType(account.getAccountType())
                 .initialBalance(account.getInitialBalance())
+                .availableBalance(account.getInitialBalance())
                 .status(account.getStatus() == null ? true : account.getStatus())
                 .customerId(customer.getCustomerId())
                 .build();
         return toView(accountRepository.save(newAccount));
-        
-
     }
 
     // -------------------------------------------------------------------- READ
@@ -222,30 +214,5 @@ public class AccountService {
         BigDecimal latestBalance = movementRepository.findLatestBalance(account.getAccountNumber())
                 .orElse(account.getInitialBalance());
         return new AccountView(account, latestBalance);
-    }
-
-    /**
-     * Numero de cuenta aleatorio de 6 digitos, reintentando hasta que no exista.
-     *
-     * TODO: bucle con existsByAccountNumber; pon un tope de intentos para no
-     * dejar un while(true) si el espacio se llenara.
-     */
-    private String generateAccountNumber() {
-
-
-        for (int attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-            String candidate = String.valueOf(
-                    RANDOM.nextInt(ACCOUNT_NUMBER_ORIGIN, ACCOUNT_NUMBER_BOUND));
-
-            if (!accountRepository.existsByAccountNumber(candidate)) {
-                return candidate;
-            }
-            log.debug("Account number {} already taken, retrying {}/{}",
-                    candidate, attempt, MAX_GENERATION_ATTEMPTS);
-        }
-
-        throw new IllegalStateException(
-                "Could not generate a free account number after "
-                        + MAX_GENERATION_ATTEMPTS + " attempts");
     }
 }

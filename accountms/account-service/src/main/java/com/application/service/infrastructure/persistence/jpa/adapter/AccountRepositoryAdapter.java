@@ -93,4 +93,11 @@ public class AccountRepositoryAdapter implements AccountRepositoryPort {
         movementRepository.deleteByAccountNumber(accountNumber);
         accountRepository.deleteById(accountNumber);
     }
+
+    @Override
+    @Transactional
+    public long nextAccountNumberSequenceValue() {
+        accountRepository.advance();
+        return accountRepository.currentValue();
+    }
 }

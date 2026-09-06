@@ -49,3 +49,24 @@
 --   Usa DECIMAL, nunca DOUBLE/FLOAT para dinero: el binario flotante no
 --   representa exacto valores como 0.10 y los saldos terminan descuadrados.
 -- ---------------------------------------------------------------------
+
+
+-- ---------------------------------------------------------------------
+-- TODO 3: tabla account_number_seq  (la usa AccountNumberSequenceAdapter)
+--   next_value  BIGINT UNSIGNED NOT NULL
+--   una sola fila, sembrada en 0:
+--       INSERT INTO account_number_seq (next_value) VALUES (0);
+--
+--   MySQL no tiene CREATE SEQUENCE. El adaptador hace
+--       UPDATE account_number_seq SET next_value = LAST_INSERT_ID(next_value + 1);
+--       SELECT LAST_INSERT_ID();
+--   El UPDATE toma lock de fila, asi que dos peticiones simultaneas se
+--   serializan y no pueden recibir el mismo numero.
+--
+--   No pongas AUTO_INCREMENT ni PK aqui: es un contador de una fila, no una
+--   tabla de filas. Si la siembras vacia el UPDATE no afecta ninguna fila y
+--   nextValue() devuelve basura.
+--
+--   El dominio son 100.000.000 numeros (HALF^2 en AccountHelpers). Si
+--   next_value llega ahi, AccountHelpers lanza AccountNumberExhaustedException.
+-- ---------------------------------------------------------------------

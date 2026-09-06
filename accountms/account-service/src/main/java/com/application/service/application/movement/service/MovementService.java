@@ -74,7 +74,7 @@ public class MovementService {
     public Movement create(Movement movement) {
         requirePositiveValue(movement.getValue());
 
-        Account account = loadAccount(movement.getAccountNumber());
+        Account account = loadAccountForMovement(movement.getAccountNumber());
 
         BigDecimal newBalance = applyToBalance(account, movement.signedValue());
 
@@ -193,7 +193,7 @@ public class MovementService {
         requirePositiveValue(newValue);
         requireLastMovement(existing);
 
-        Account account = loadAccount(existing.getAccountNumber());
+        Account account = loadAccountForMovement(existing.getAccountNumber());
 
         BigDecimal delta = newType.signed(newValue).subtract(existing.signedValue());
         BigDecimal newBalance = applyToBalance(account, delta);
@@ -242,7 +242,10 @@ public class MovementService {
         }
     }
 
-    private Account loadAccount(String accountNumber) {
+    /**
+     * Carga la cuenta para un movimiento específico.
+     */
+    private Account loadAccountForMovement(String accountNumber) {
         return accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
     }

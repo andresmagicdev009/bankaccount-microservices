@@ -29,6 +29,7 @@ import com.application.service.domain.account.entity.Account;
  * tipo de paginacion; para este proyecto no vale la pena.
  */
 public interface AccountRepositoryPort {
+    
     Account save(Account account);
 
     Optional<Account> findByAccountNumber(String accountNumber);
@@ -40,4 +41,6 @@ public interface AccountRepositoryPort {
     Page<Account> findAll(String customerId, Pageable pageable);
 
     void deleteByAccountNumber(String accountNumber);
+
+    long nextAccountNumberSequenceValue();
 }

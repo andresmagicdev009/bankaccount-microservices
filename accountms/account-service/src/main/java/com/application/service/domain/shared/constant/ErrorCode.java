@@ -40,6 +40,12 @@ public enum ErrorCode {
     INVALID_DATE_RANGE("Start date %s must not be after end date %s"),
     /** args: (sizeRecibido) */
     INVALID_PAGE_SIZE("Page size must be between 1 and 100, got: %s"),
+    /**
+     * args: ninguno. La secuencia paso del tamano del dominio: no quedan
+     * numeros de cuenta libres. No es error del cliente, sale como 500.
+     */
+    ACCOUNT_NUMBER_EXHAUSTED("Account number space is exhausted"),
+
     /** args: (customerId) */
     CUSTOMER_SERVICE_UNAVAILABLE("Customer service is down 😒");
 

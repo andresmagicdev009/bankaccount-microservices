@@ -38,6 +38,7 @@ public class Account {
     private String accountNumber;
     private AccountType accountType;
     private BigDecimal initialBalance;
+    private BigDecimal availableBalance;
     private Boolean status;
     private String customerId;
     private LocalDateTime createdAt;
