@@ -1,5 +1,6 @@
 package com.application.service.domain.account.repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,7 +33,25 @@ public interface AccountRepositoryPort {
     
     Account save(Account account);
 
+    /**
+     * Escritura dedicada del saldo disponible: es la unica que toca esa columna.
+     *
+     * No va por save(Account) a proposito. save copia todo el estado de la
+     * cuenta, asi que un PUT /accounts que hubiera leido la fila antes de un
+     * movimiento reescribiria el saldo viejo encima del nuevo. Separando la
+     * escritura, el CRUD de cuentas ya no puede pisar el saldo ni por descuido.
+     */
+    void updateAvailableBalance(String accountNumber, BigDecimal availableBalance);
+
     Optional<Account> findByAccountNumber(String accountNumber);
+
+    /**
+     * Igual que findByAccountNumber pero bloqueando la fila hasta el COMMIT.
+     *
+     * Lo usa todo el que vaya a mover el saldo. Solo tiene sentido dentro de una
+     * transaccion: sin ella el bloqueo se libera de inmediato.
+     */
+    Optional<Account> findByAccountNumberForUpdate(String accountNumber);
 
     boolean existsByAccountNumber(String accountNumber);
 

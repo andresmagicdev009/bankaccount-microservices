@@ -36,6 +36,11 @@ public enum ErrorCode {
 
     /** args: (accountNumber) */
     BALANCE_NOT_ZERO("Account %s cannot be deleted: its balance must be zero"),
+    /**
+     * args: (accountNumber). Una cuenta inactiva sigue existiendo -por eso no es
+     * un 404-: es su estado el que no admite movimientos.
+     */
+    ACCOUNT_INACTIVE("Account %s does not accept movements: it is inactive"),
     /** args: (startDate, endDate) */
     INVALID_DATE_RANGE("Start date %s must not be after end date %s"),
     /** args: (sizeRecibido) */

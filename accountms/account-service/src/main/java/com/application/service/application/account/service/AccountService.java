@@ -19,7 +19,6 @@ import com.application.service.domain.account.repository.AccountRepositoryPort;
 import com.application.service.domain.customer.entity.CustomerSnapshot;
 import com.application.service.domain.customer.exception.CustomerNotFoundException;
 import com.application.service.domain.customer.port.CustomerLookupPort;
-import com.application.service.domain.movement.repository.MovementRepositoryPort;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +33,12 @@ import lombok.extern.slf4j.Slf4j;
  * @Transactional funciona sobre un solo hilo.
  *
  * Todo metodo de lectura devuelve AccountView y no Account: el contrato expone
- * availableBalance, que no es columna de account sino el balance del ultimo
- * movimiento. Resolverlo aqui evita que el mapper tenga que tocar repositorios.
+ * availableBalance como campo de primer nivel, y armar la vista aqui evita que
+ * el mapper tenga que decidir de donde sale el saldo.
+ *
+ * El saldo disponible ES la columna available_balance de account. Quien la
+ * mueve es MovementHelpers.applyToBalance, la unica puerta del saldo; este
+ * servicio solo la lee, y la fija una vez al crear la cuenta.
  */
 @Service
 @RequiredArgsConstructor    
@@ -46,7 +49,6 @@ public class AccountService {
     private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
 
     private final AccountRepositoryPort accountRepository;
-    private final MovementRepositoryPort movementRepository;
     private final CustomerLookupPort customerLookup;
 
     /**
@@ -106,9 +108,8 @@ public class AccountService {
      * TODO: PageRequestFactory.of(page, size, DEFAULT_SORT) ->
      * accountRepository.findAll(customerId, pageable) -> page.map(this::toView).
      *
-     * Ojo: un toView por fila son N consultas de saldo. Aceptable para este
-     * proyecto; si molestara, se resuelve con un findLatestBalances(List) en el
-     * puerto de movimientos.
+     * El saldo disponible viene en la misma fila que la cuenta, asi que listar
+     * son dos consultas contando el count de la paginacion: ni una por fila.
      */
     @Transactional(readOnly = true)
     public Page<AccountView> list(String customerId, Integer page, Integer size) {
@@ -192,10 +193,9 @@ public class AccountService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
 
-        BigDecimal latestBalance = movementRepository.findLatestBalance(accountNumber)
-                .orElse(account.getInitialBalance());
+        BigDecimal availableBalance = availableBalanceOf(account);
 
-        if (latestBalance.compareTo(BigDecimal.ZERO) != 0) {
+        if (availableBalance.compareTo(BigDecimal.ZERO) != 0) {
             throw new AccountBalanceNotZeroException(accountNumber);
         }
 
@@ -204,15 +204,22 @@ public class AccountService {
 
     // ----------------------------------------------------------------- HELPERS
 
-    /**
-     * Une la cuenta con su saldo disponible.
-     *
-     * TODO: movementRepository.findLatestBalance(numero)
-     * .orElse(account.getInitialBalance()) y envolver en AccountView.
-     */
+    /** Une la cuenta con su saldo disponible. */
     private AccountView toView(Account account) {
-        BigDecimal latestBalance = movementRepository.findLatestBalance(account.getAccountNumber())
-                .orElse(account.getInitialBalance());
-        return new AccountView(account, latestBalance);
+        return new AccountView(account, availableBalanceOf(account));
+    }
+
+    /**
+     * Saldo disponible de la cuenta.
+     *
+     * El fallback al saldo de apertura cubre las filas anteriores a la columna
+     * available_balance, que la traen en null. Mismo criterio que
+     * MovementHelpers.currentBalance: si los dos no coinciden, el saldo que se
+     * muestra y el que se valida se separan.
+     */
+    private BigDecimal availableBalanceOf(Account account) {
+        return (account.getAvailableBalance() == null)
+                ? account.getInitialBalance()
+                : account.getAvailableBalance();
     }
 }

@@ -3,7 +3,6 @@ package com.application.service.application.movement.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,16 +12,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.application.service.application.movement.helpers.MovementHelpers;
 import com.application.service.application.shared.PageRequestFactory;
 import com.application.service.domain.account.entity.Account;
-import com.application.service.domain.account.exception.AccountNotFoundException;
-import com.application.service.domain.movement.exception.InsufficientBalanceException;
-import com.application.service.domain.movement.exception.InvalidMovementValueException;
-import com.application.service.domain.movement.exception.MovementNotFoundException;
-import com.application.service.domain.movement.exception.MovementNotLastException;
-import com.application.service.domain.shared.exception.InvalidDateRangeException;
-
-import com.application.service.domain.account.repository.AccountRepositoryPort;
 import com.application.service.domain.movement.entity.Movement;
 import com.application.service.domain.movement.entity.MovementType;
 
@@ -57,7 +49,12 @@ public class MovementService {
     private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "date", "movementId");
 
     private final MovementRepositoryPort movementRepository;
-    private final AccountRepositoryPort accountRepository;
+
+    /**
+     * Colaborador: carga de entidades, validaciones y la puerta del saldo. El
+     * servicio se queda solo con el QUE de cada caso de uso.
+     */
+    private final MovementHelpers movementHelpers;
 
     // ------------------------------------------------------------------ CREATE
 
@@ -72,11 +69,12 @@ public class MovementService {
      */
     @Transactional
     public Movement create(Movement movement) {
-        requirePositiveValue(movement.getValue());
+        movementHelpers.requirePositiveValue(movement.getValue());
 
-        Account account = loadAccountForMovement(movement.getAccountNumber());
+        Account account = movementHelpers.loadAccountForMovement(movement.getAccountNumber());
+        movementHelpers.requireActiveAccount(account);
 
-        BigDecimal newBalance = applyToBalance(account, movement.signedValue());
+        BigDecimal newBalance = movementHelpers.applyToBalance(account, movement.signedValue());
 
         movement.setMovementId(UUID.randomUUID().toString());
         movement.setDate(LocalDateTime.now());
@@ -96,7 +94,7 @@ public class MovementService {
     /** GET /movements/{movementId}. */
     @Transactional(readOnly = true)
     public Movement get(String movementId) {
-        return loadMovement(movementId);
+        return movementHelpers.loadMovement(movementId);
     }
 
     /**
@@ -109,11 +107,11 @@ public class MovementService {
     public Page<Movement> list(String accountNumber, String customerId,
             LocalDate startDate, LocalDate endDate,
             Integer page, Integer size) {
-        requireValidRange(startDate, endDate);
+        movementHelpers.requireValidRange(startDate, endDate);
 
         Pageable pageable = PageRequestFactory.of(page, size, DEFAULT_SORT);
 
-        List<String> accountNumbers = resolveAccountNumbers(customerId);
+        List<String> accountNumbers = movementHelpers.resolveAccountNumbers(customerId);
 
         // Cliente sin cuentas: no hay nada que buscar y un IN () vacio es SQL invalido.
         if (accountNumbers != null && accountNumbers.isEmpty()) {
@@ -121,7 +119,7 @@ public class MovementService {
         }
 
         return movementRepository.findAll(accountNumber, accountNumbers,
-                toFrom(startDate), toTo(endDate), pageable);
+                movementHelpers.toFrom(startDate), movementHelpers.toTo(endDate), pageable);
     }
 
     // ------------------------------------------------------------------ UPDATE
@@ -137,7 +135,7 @@ public class MovementService {
      */
     @Transactional
     public Movement update(String movementId, Movement changes) {
-        Movement existing = loadMovement(movementId);
+        Movement existing = movementHelpers.loadMovement(movementId);
 
         return replaceAmount(existing, changes.getMovementType(), changes.getValue());
     }
@@ -148,7 +146,7 @@ public class MovementService {
      */
     @Transactional
     public Movement patch(String movementId, MovementType movementType, BigDecimal value) {
-        Movement existing = loadMovement(movementId);
+        Movement existing = movementHelpers.loadMovement(movementId);
 
         if (movementType == null && value == null) {
             return existing;
@@ -162,19 +160,26 @@ public class MovementService {
     /**
      * DELETE /movements/{movementId} - reversa del movimiento.
      *
-     * No hace falta recalcular nada: el saldo disponible sale de
-     * findLatestBalance, o sea del movimiento que quede como ultimo.
+     * Aplicar el signo contrario devuelve la cuenta exactamente al saldo que
+     * tenia antes, o sea al balance del movimiento que queda como ultimo. Va
+     * por applyToBalance como todo lo demas: la reversa de un credito baja el
+     * saldo y tambien tiene que respetar F3.
      */
     @Transactional
     public void delete(String movementId) {
-        Movement movement = loadMovement(movementId);
+        Movement movement = movementHelpers.loadMovement(movementId);
 
-        requireLastMovement(movement);
+        movementHelpers.requireLastMovement(movement);
+
+        Account account = movementHelpers.loadAccountForMovement(movement.getAccountNumber());
+        movementHelpers.requireActiveAccount(account);
+
+        BigDecimal restoredBalance = movementHelpers.applyToBalance(account, movement.signedValue().negate());
 
         movementRepository.deleteById(movementId);
 
-        log.info("Movement {} reversed on account {}",
-                movementId, movement.getAccountNumber());
+        log.info("Movement {} reversed on account {}: balance back to {}",
+                movementId, movement.getAccountNumber(), restoredBalance);
     }
 
     // ----------------------------------------------------------------- HELPERS
@@ -190,13 +195,14 @@ public class MovementService {
         MovementType newType = (movementType == null) ? existing.getMovementType() : movementType;
         BigDecimal newValue = (value == null) ? existing.getValue() : value;
 
-        requirePositiveValue(newValue);
-        requireLastMovement(existing);
+        movementHelpers.requirePositiveValue(newValue);
+        movementHelpers.requireLastMovement(existing);
 
-        Account account = loadAccountForMovement(existing.getAccountNumber());
+        Account account = movementHelpers.loadAccountForMovement(existing.getAccountNumber());
+        movementHelpers.requireActiveAccount(account);
 
         BigDecimal delta = newType.signed(newValue).subtract(existing.signedValue());
-        BigDecimal newBalance = applyToBalance(account, delta);
+        BigDecimal newBalance = movementHelpers.applyToBalance(account, delta);
 
         existing.setMovementType(newType);
         existing.setValue(newValue);
@@ -205,102 +211,5 @@ public class MovementService {
         return movementRepository.save(existing);
     }
 
-    /**
-     * Regla F3. Unica puerta por la que se toca el saldo.
-     *
-     * El detalle -disponible vs. solicitado- va al log y nunca al cuerpo de la
-     * respuesta: el cliente solo debe leer "Saldo no disponible".
-     */
-    private BigDecimal applyToBalance(Account account, BigDecimal signedDelta) {
-        BigDecimal current = currentBalance(account);
-        BigDecimal resulting = current.add(signedDelta);
-
-        // compareTo y no equals: BigDecimal("0.00").equals(ZERO) es false.
-        if (resulting.compareTo(BigDecimal.ZERO) < 0) {
-            log.warn("Insufficient balance on account {}: available {}, requested {}",
-                    account.getAccountNumber(), current, signedDelta.abs());
-            throw new InsufficientBalanceException();
-        }
-
-        return resulting;
-    }
-
-    /**
-     * Saldo disponible actual: el balance del ultimo movimiento, o el saldo de
-     * apertura si la cuenta todavia no tiene ninguno. Mismo criterio que
-     * AccountService.toView.
-     */
-    private BigDecimal currentBalance(Account account) {
-        return movementRepository.findLatestBalance(account.getAccountNumber())
-                .orElse(account.getInitialBalance());
-    }
-
-    /** "Mayor que cero" es estricto: el cero tambien se rechaza. */
-    private void requirePositiveValue(BigDecimal value) {
-        if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidMovementValueException(value);
-        }
-    }
-
-    /**
-     * Carga la cuenta para un movimiento específico.
-     */
-    private Account loadAccountForMovement(String accountNumber) {
-        return accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
-    }
-
-    private Movement loadMovement(String movementId) {
-        return movementRepository.findById(movementId)
-                .orElseThrow(() -> new MovementNotFoundException(movementId));
-    }
-
-    /**
-     * Blindaje del saldo historico: solo el ultimo movimiento de la cuenta se
-     * puede editar o borrar. Tocar uno intermedio dejaria mal todos los balance
-     * posteriores.
-     */
-    private void requireLastMovement(Movement movement) {
-        String lastId = movementRepository.findLatest(movement.getAccountNumber())
-                .map(Movement::getMovementId)
-                .orElse(null);
-
-        if (!movement.getMovementId().equals(lastId)) {
-            throw new MovementNotLastException(movement.getMovementId(), movement.getAccountNumber());
-        }
-    }
-
-    /**
-     * Cuentas del cliente, para el filtro por usuario del listado.
-     *
-     * null -> sin filtro. Lista vacia -> el cliente no tiene cuentas, que no es
-     * lo mismo: por eso list corta antes de consultar.
-     */
-    private List<String> resolveAccountNumbers(String customerId) {
-        if (customerId == null) {
-            return null;
-        }
-
-        return accountRepository.findByCustomerId(customerId).stream()
-                .map(Account::getAccountNumber)
-                .toList();
-    }
-
-    private void requireValidRange(LocalDate startDate, LocalDate endDate) {
-        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-            throw new InvalidDateRangeException(startDate, endDate);
-        }
-    }
-
-    private LocalDateTime toFrom(LocalDate startDate) {
-        return (startDate == null) ? null : startDate.atStartOfDay();
-    }
-
-    /**
-     * Con atStartOfDay() aqui perderias todos los movimientos del propio dia
-     * final del rango.
-     */
-    private LocalDateTime toTo(LocalDate endDate) {
-        return (endDate == null) ? null : endDate.atTime(LocalTime.MAX);
-    }
+    
 }

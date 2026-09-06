@@ -14,10 +14,17 @@ import com.application.service.infrastructure.persistence.jpa.entity.AccountEnti
 @Component
 public class AccountPersistenceMapper {
 
-    /** Para insertar: la entidad todavia no existe en la base. */
+    /**
+     * Para insertar: la entidad todavia no existe en la base.
+     *
+     * Es el unico punto del mapper que escribe availableBalance: una cuenta nace
+     * con su saldo de apertura. De ahi en adelante la columna solo la mueve
+     * AccountRepositoryPort.updateAvailableBalance.
+     */
     public AccountEntity toEntity(Account account) {
         AccountEntity entity = new AccountEntity();
         entity.setAccountNumber(account.getAccountNumber());
+        entity.setAvailableBalance(account.getAvailableBalance());
         copyState(entity, account);
         return entity;
     }
@@ -26,6 +33,11 @@ public class AccountPersistenceMapper {
      * Copia solo el estado mutable sobre una entidad YA administrada por JPA.
      * No toca el id ni createdAt/updatedAt: de esos se encarga Hibernate, y
      * pisarlos borraria la fecha de alta original.
+     *
+     * Tampoco toca availableBalance, y eso es deliberado: el CRUD de cuentas
+     * trabaja sobre una lectura sin bloqueo, asi que copiar el saldo aqui haria
+     * que un PUT /accounts concurrente con un movimiento reescribiera el saldo
+     * viejo encima del recien calculado.
      */
     public void updateEntity(AccountEntity entity, Account account) {
         copyState(entity, account);
@@ -39,6 +51,7 @@ public class AccountPersistenceMapper {
                 .accountNumber(entity.getAccountNumber())
                 .accountType(entity.getAccountType())
                 .initialBalance(entity.getInitialBalance())
+                .availableBalance(entity.getAvailableBalance())
                 .status(entity.getStatus())
                 .customerId(entity.getCustomerId())
                 .createdAt(entity.getCreatedAt())

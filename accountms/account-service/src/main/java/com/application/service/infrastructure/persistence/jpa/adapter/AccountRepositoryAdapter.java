@@ -1,5 +1,6 @@
 package com.application.service.infrastructure.persistence.jpa.adapter;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,6 +58,27 @@ public class AccountRepositoryAdapter implements AccountRepositoryPort {
     @Override
     public Optional<Account> findByAccountNumber(String accountNumber) {
         return accountRepository.findById(accountNumber).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Account> findByAccountNumberForUpdate(String accountNumber) {
+        return accountRepository.findByAccountNumberForUpdate(accountNumber).map(mapper::toDomain);
+    }
+
+    /**
+     * Unico UPDATE que toca available_balance.
+     *
+     * Si la fila ya venia cargada en esta transaccion -lo normal: el llamador la
+     * leyo con bloqueo-, findById la saca del contexto de persistencia sin
+     * volver a la base y sin soltar el bloqueo.
+     */
+    @Override
+    public void updateAvailableBalance(String accountNumber, BigDecimal availableBalance) {
+        AccountEntity entity = accountRepository.findById(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
+
+        entity.setAvailableBalance(availableBalance);
+        accountRepository.save(entity);
     }
 
     @Override
