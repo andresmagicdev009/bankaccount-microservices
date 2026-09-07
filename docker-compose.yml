@@ -1,0 +1,78 @@
+services:
+  db:
+    image: mariadb:11.4
+    container_name: bank-db
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+    ports:
+      # 3307 en el host para no chocar con XAMPP (3306).
+      - "3307:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/init-schemas.sql:/docker-entrypoint-initdb.d/01-init-schemas.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - bank-net
+
+  ms-customers:
+    build:
+      context: ./customerms
+    image: bank/ms-customers:0.0.1
+    container_name: ms-customers
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_CUSTOMER_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD:  ${SPRING_DATASOURCE_PASSWORD}
+      # El contenedor es MariaDB: mismo dialecto que usa account-service.
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MariaDBDialect
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/api/v1/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - bank-net
+
+  ms-accounts:
+    build:
+      context: ./accountms/account-service
+    image: bank/ms-accounts:0.0.1
+    container_name: ms-accounts
+    depends_on:
+      db:
+        condition: service_healthy
+      ms-customers:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_ACCOUNT_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      # Resuelve por nombre de servicio dentro de bank-net.
+      CUSTOMERS_SERVICE_URL: http://ms-customers:8081/api/v1
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/api/v1/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - bank-net
+
+networks:
+  bank-net:
+    driver: bridge
+
+volumes:
+  db-data:

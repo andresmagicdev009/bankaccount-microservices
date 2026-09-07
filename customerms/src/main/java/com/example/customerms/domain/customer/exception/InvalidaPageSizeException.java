@@ -1,13 +1,16 @@
 package com.example.customerms.domain.customer.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import com.example.customerms.domain.shared.exception.DomainException;
+import com.example.customerms.domain.shared.exception.ErrorType;
 
-@ResponseStatus(HttpStatus.BAD_REQUEST) // Fuerza el codigo HTTP 400
-public class InvalidaPageSizeException extends RuntimeException {
+/**
+ * Ya no lleva @ResponseStatus: el status sale del ErrorType y lo aplica el
+ * advice, que ademas devuelve el cuerpo Error del contrato.
+ */
+public class InvalidaPageSizeException extends DomainException {
 
     public InvalidaPageSizeException(Integer size, String message) {
-        super(message + " Invalid page size: " + size + ". Page size must be between 1 and 100.");
+        super(ErrorType.INVALID_INPUT, "INVALID_PAGE_SIZE",
+                message + " Invalid page size: " + size + ". Page size must be between 1 and 100.");
     }
-    
 }

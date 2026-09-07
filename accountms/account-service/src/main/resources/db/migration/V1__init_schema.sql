@@ -9,64 +9,92 @@
 -- Convencion de nombres: la migracion ya se llama V1__init_schema.sql; la
 -- siguiente seria V2__loQueSea.sql. Una vez aplicada, NUNCA edites una version
 -- existente: crea una nueva.
+--
+-- El contador account_number_seq NO esta aqui: lo crea V2__account_number_seq.sql.
 -- =====================================================================
 
+
 -- ---------------------------------------------------------------------
--- TODO 1: tabla account
---   account_number     VARCHAR(20)    NOT NULL   -> PK natural (no autoincremental)
---   account_type       ENUM('SAVINGS','CHECKING') NOT NULL
---   initial_balance    DECIMAL(19,2)  NOT NULL DEFAULT 0.00
---   available_balance  DECIMAL(19,2)  NOT NULL DEFAULT 0.00
---   status             BOOLEAN        NOT NULL DEFAULT TRUE
---   customer_id        CHAR(36)       NOT NULL
---   created_at         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP
---   updated_at         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP
---                                     ON UPDATE CURRENT_TIMESTAMP
---   PRIMARY KEY (account_number)
---   indice por customer_id (lo consultan el listado filtrado y el reporte)
+-- account  (AccountEntity)
 --
---   OJO: customer_id NO lleva FOREIGN KEY. El cliente vive en la base de datos
---   del otro microservicio; la integridad se valida por REST, no por la BD.
---   Poner una FK aqui seria acoplar dos bases que deben ser independientes.
+-- account_type y movement_type son VARCHAR, no ENUM: las entidades usan
+-- @Enumerated(EnumType.STRING), asi que Hibernate espera un tipo texto. Un
+-- ENUM de MySQL reporta otro codigo JDBC y la validacion de esquema fallaria.
+-- El CHECK da la misma garantia de valores sin romper la validacion.
+--
+-- customer_id es VARCHAR(36) y no CHAR(36): el campo Java es String con
+-- length = 36, y Hibernate compara CHAR (Types.CHAR) contra VARCHAR
+-- (Types.VARCHAR) como tipos distintos.
+--
+-- customer_id NO lleva FOREIGN KEY. El cliente vive en la base del otro
+-- microservicio; la integridad se valida por REST contra CustomerLookupPort.
+-- Una FK aqui acoplaria dos bases que deben ser independientes.
+--
+-- DECIMAL(15,2) en los saldos, nunca DOUBLE/FLOAT: el binario flotante no
+-- representa exacto valores como 0.10 y los saldos terminan descuadrados.
+-- La precision sale de las entidades (precision = 15, scale = 2).
 -- ---------------------------------------------------------------------
+CREATE TABLE account (
+    account_number    VARCHAR(20)   NOT NULL,
+    account_type      VARCHAR(20)   NOT NULL,
+    initial_balance   DECIMAL(15,2) NOT NULL,
+    available_balance DECIMAL(15,2) NOT NULL,
+    status            BOOLEAN       NOT NULL DEFAULT TRUE,
+    customer_id       VARCHAR(36)   NOT NULL,
+    created_at        DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at        DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                                    ON UPDATE CURRENT_TIMESTAMP(6),
+
+    PRIMARY KEY (account_number),
+
+    CONSTRAINT ck_account_type CHECK (account_type IN ('SAVINGS', 'CHECKING')),
+
+    -- Lo consultan findByCustomerId (listado filtrado) y el reporte.
+    INDEX ix_account_customer_id (customer_id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci;
 
 
 -- ---------------------------------------------------------------------
--- TODO 2: tabla movement
---   movement_id     CHAR(36)       NOT NULL   -> PK (UUID en texto)
---   movement_date   DATETIME       NOT NULL   -> "date" es palabra reservada
---   movement_type   ENUM('DEBIT','CREDIT') NOT NULL
---   value           DECIMAL(19,2)  NOT NULL
---   balance         DECIMAL(19,2)  NOT NULL   -> saldo despues del movimiento
---   account_number  VARCHAR(20)    NOT NULL
---   PRIMARY KEY (movement_id)
---   indice (account_number, movement_date) -> es como consulta el reporte
---   FOREIGN KEY account_number -> account(account_number)
---       aqui SI va FK: ambas tablas viven en esta misma base.
---       Decide ON DELETE CASCADE o borrado explicito en el adaptador, pero
---       que sea coherente con lo que programes en AccountRepositoryAdapter.
+-- movement  (MovementEntity)
 --
---   Usa DECIMAL, nunca DOUBLE/FLOAT para dinero: el binario flotante no
---   representa exacto valores como 0.10 y los saldos terminan descuadrados.
+-- La PK se llama id, no movement_id: el campo Java movementId esta mapeado
+-- con @Column(name = "id").
+--
+-- date es fecha de negocio (la puede fijar el cliente); created_at es
+-- auditoria de insercion. No son lo mismo, por eso van las dos.
+--
+-- DATETIME(6) y no DATETIME: LocalDateTime en Hibernate 6 mapea a precision
+-- de microsegundo. Ademas reduce los empates que desempata
+-- findFirstByAccountNumberOrderByDateDescMovementIdDesc.
+--
+-- account_number SI lleva FK: ambas tablas viven en esta misma base.
+-- Sin ON DELETE CASCADE a proposito: AccountRepositoryAdapter.deleteByAccountNumber
+-- borra los movimientos y despues la cuenta, en ese orden y dentro de la misma
+-- transaccion. Con RESTRICT (el default) la FK ademas atrapa cualquier borrado
+-- que se salte ese orden en vez de arrasar historial en silencio.
 -- ---------------------------------------------------------------------
+CREATE TABLE movement (
+    id             VARCHAR(36)   NOT NULL,
+    `date`         DATETIME(6)   NOT NULL,
+    movement_type  VARCHAR(10)   NOT NULL,
+    `value`        DECIMAL(15,2) NOT NULL,
+    -- Saldo de la cuenta DESPUES de aplicar este movimiento. Historico congelado.
+    balance        DECIMAL(15,2) NOT NULL,
+    account_number VARCHAR(20)   NOT NULL,
+    created_at     DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
 
+    PRIMARY KEY (id),
 
--- ---------------------------------------------------------------------
--- TODO 3: tabla account_number_seq  (la usa AccountNumberSequenceAdapter)
---   next_value  BIGINT UNSIGNED NOT NULL
---   una sola fila, sembrada en 0:
---       INSERT INTO account_number_seq (next_value) VALUES (0);
---
---   MySQL no tiene CREATE SEQUENCE. El adaptador hace
---       UPDATE account_number_seq SET next_value = LAST_INSERT_ID(next_value + 1);
---       SELECT LAST_INSERT_ID();
---   El UPDATE toma lock de fila, asi que dos peticiones simultaneas se
---   serializan y no pueden recibir el mismo numero.
---
---   No pongas AUTO_INCREMENT ni PK aqui: es un contador de una fila, no una
---   tabla de filas. Si la siembras vacia el UPDATE no afecta ninguna fila y
---   nextValue() devuelve basura.
---
---   El dominio son 100.000.000 numeros (HALF^2 en AccountHelpers). Si
---   next_value llega ahi, AccountHelpers lanza AccountNumberExhaustedException.
--- ---------------------------------------------------------------------
+    CONSTRAINT ck_movement_type CHECK (movement_type IN ('DEBIT', 'CREDIT')),
+
+    -- Es como consultan el reporte y el ultimo movimiento. El id va al final
+    -- para que el desempate por movementId tampoco toque tabla.
+    INDEX ix_movement_account_date (account_number, `date`, id),
+
+    CONSTRAINT fk_movement_account
+        FOREIGN KEY (account_number) REFERENCES account (account_number)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci;
