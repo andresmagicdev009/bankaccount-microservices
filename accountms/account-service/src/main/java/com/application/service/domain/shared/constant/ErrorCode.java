@@ -52,7 +52,7 @@ public enum ErrorCode {
     ACCOUNT_NUMBER_EXHAUSTED("Account number space is exhausted"),
 
     /** args: (customerId) */
-    CUSTOMER_SERVICE_UNAVAILABLE("Customer service is down 😒");
+    CUSTOMER_SERVICE_UNAVAILABLE("Customer service is down 😶‍🌫️.");
 
     private final String template;
 

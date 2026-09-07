@@ -37,16 +37,28 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ReportService {
 
+    /** Limite inferior cuando no mandan startDate: no hay movimientos antes. */
+    private static final LocalDate OPEN_START = LocalDate.of(1970, 1, 1);
+
     private final AccountRepositoryPort accountRepository;
     private final MovementRepositoryPort movementRepository;
     private final CustomerLookupPort customerLookup;
 
+    /**
+     * Las dos fechas son opcionales en el contrato: sin startDate el rango
+     * arranca abierto y sin endDate termina hoy. El estado de cuenta viaja con
+     * las fechas efectivas, no con los nulos, para que el reporte diga siempre
+     * que periodo cubre.
+     */
     @Transactional(readOnly = true)
     public AccountStatement generate(String customerId, LocalDate startDate, LocalDate endDate) {
 
+        LocalDate from = startDate != null ? startDate : OPEN_START;
+        LocalDate until = endDate != null ? endDate : LocalDate.now();
+
         // a) Rango imposible: se rechaza antes de tocar la base.
-        if (startDate.isAfter(endDate)) {
-            throw new InvalidDateRangeException(startDate, endDate);
+        if (from.isAfter(until)) {
+            throw new InvalidDateRangeException(from, until);
         }
 
         // b) El nombre y la identificacion viven en el otro microservicio.
@@ -67,24 +79,24 @@ public class ReportService {
         // d) Los movimientos viajan aparte porque Account no los contiene: son dos
         //    agregados distintos y solo el reporte necesita verlos juntos.
         //    LinkedHashMap para que el orden de las cuentas sea reproducible.
-        LocalDateTime from = startDate.atStartOfDay();
-        LocalDateTime to = endDate.atTime(LocalTime.MAX);
+        LocalDateTime rangeStart = from.atStartOfDay();
+        LocalDateTime rangeEnd = until.atTime(LocalTime.MAX);
 
         Map<String, List<Movement>> movementsByAccount = new LinkedHashMap<>();
         for (Account account : accounts) {
             movementsByAccount.put(
                     account.getAccountNumber(),
-                    movementRepository.findByAccountAndRange(account.getAccountNumber(), from, to));
+                    movementRepository.findByAccountAndRange(account.getAccountNumber(), rangeStart, rangeEnd));
         }
 
         log.info("Statement generated for customer {} [{} .. {}]: {} accounts",
-                customerId, startDate, endDate, accounts.size());
+                customerId, from, until, accounts.size());
 
         // e) El servicio responde QUE datos; ReportMapper decidira COMO se ven.
         return AccountStatement.builder()
                 .customer(customer)
-                .startDate(startDate)
-                .endDate(endDate)
+                .startDate(from)
+                .endDate(until)
                 .accounts(accounts)
                 .movementsByAccount(movementsByAccount)
                 .build();

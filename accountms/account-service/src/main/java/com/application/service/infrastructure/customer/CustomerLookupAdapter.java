@@ -1,4 +1,4 @@
-package com.application.service.infrastructure.client.customer;
+package com.application.service.infrastructure.customer;
 
 import java.util.Optional;
 
@@ -9,7 +9,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import com.application.service.domain.customer.entity.CustomerSnapshot;
 import com.application.service.domain.customer.exception.CustomerServiceUnavailableException;
 import com.application.service.domain.customer.port.CustomerLookupPort;
-import com.application.service.infrastructure.client.customer.dto.CustomerResponse;
+import com.application.service.domain.customer.dto.CustomerResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +37,7 @@ public class CustomerLookupAdapter implements CustomerLookupPort {
             CustomerResponse response = customerWebClient.get()
                     .uri("/customers/{customerId}", customerId)
                     .retrieve()
-                    .bodyToMono(CustomerResponse.class)
+                    .bodyToMono(com.application.service.domain.customer.dto.CustomerResponse.class)
                     .block();
 
             return Optional.ofNullable(response).map(this::toSnapshot);

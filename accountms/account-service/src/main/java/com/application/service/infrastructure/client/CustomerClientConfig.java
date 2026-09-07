@@ -1,4 +1,4 @@
-package com.application.service.infrastructure.config;
+package com.application.service.infrastructure.client;
 
 import java.time.Duration;
 
@@ -28,7 +28,7 @@ public class CustomerClientConfig {
     @Bean
     public WebClient customerWebClient(
             @Value("${customers.service.url}") String baseUrl,
-            @Value("${customers.service.timeout-ms:3000}") int timeoutMs) {
+            @Value("${customers.service.timeout-ms}") int timeoutMs) {
 
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeoutMs)

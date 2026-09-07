@@ -1,4 +1,4 @@
-package com.application.service.infrastructure.client.customer.dto;
+package com.application.service.domain.customer.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

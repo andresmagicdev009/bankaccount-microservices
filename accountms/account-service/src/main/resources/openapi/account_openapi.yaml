@@ -398,16 +398,20 @@ paths:
       parameters:
         - name: startDate
           in: query
-          required: true
-          description: Range start date (YYYY-MM-DD)
+          required: false
+          description: >
+            Range start date (YYYY-MM-DD). Optional: if omitted, the statement
+            covers everything up to endDate.
           schema:
             type: string
             format: date
           example: "2026-01-01"
         - name: endDate
           in: query
-          required: true
-          description: Range end date (YYYY-MM-DD)
+          required: false
+          description: >
+            Range end date (YYYY-MM-DD). Optional: if omitted, defaults to
+            today.
           schema:
             type: string
             format: date

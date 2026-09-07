@@ -31,4 +31,74 @@ import com.application.service.interfaces.rest.dto.MovementDetailDto;
 @Component
 public class ReportMapper {
 
+    /** Punto de entrada: estado de cuenta completo -> body del 200. */
+    public AccountStatementReportDto toDto(AccountStatement statement) {
+        List<AccountReportDto> accounts = statement.getAccounts().stream()
+                .map(account -> toAccountDto(account, statement))
+                .toList();
+
+        return new AccountStatementReportDto()
+                .customer(toCustomerDto(statement.getCustomer()))
+                .range(toRangeDto(statement))
+                .accounts(accounts);
+    }
+
+    // ------------------------------------------------------------- cabecera
+
+    private AccountStatementReportCustomerDto toCustomerDto(CustomerSnapshot customer) {
+        return new AccountStatementReportCustomerDto()
+                .customerId(DtoTypes.toUuid(customer.getCustomerId()))
+                .name(customer.getName())
+                .identification(customer.getIdentification());
+    }
+
+    private AccountStatementReportRangeDto toRangeDto(AccountStatement statement) {
+        return new AccountStatementReportRangeDto()
+                .startDate(statement.getStartDate())
+                .endDate(statement.getEndDate());
+    }
+
+    // --------------------------------------------------------------- cuenta
+
+    /**
+     * La costura: los movimientos de esta cuenta salen del mapa del statement,
+     * no del Account. getOrDefault y no get porque una cuenta sin movimientos
+     * en el rango es normal -sale con la lista vacia, no ausente del reporte.
+     */
+    private AccountReportDto toAccountDto(Account account, AccountStatement statement) {
+        List<Movement> movements = statement.getMovementsByAccount()
+                .getOrDefault(account.getAccountNumber(), List.of());
+
+        return new AccountReportDto()
+                .accountNumber(account.getAccountNumber())
+                .accountType(toContractType(account.getAccountType()))
+                .initialBalance(DtoTypes.toContractAmount(account.getInitialBalance()))
+                .availableBalance(DtoTypes.toContractAmount(account.getAvailableBalance()))
+                .status(account.getStatus())
+                .movements(movements.stream().map(this::toMovementDto).toList());
+    }
+
+    /**
+     * El detalle del reporte no lleva movementId ni accountNumber: el primero no
+     * aporta al estado de cuenta y el segundo ya esta en la cuenta que lo
+     * contiene. Por eso es un DTO distinto de MovementDto y no se reutiliza
+     * MovementMapper.
+     */
+    private MovementDetailDto toMovementDto(Movement movement) {
+        return new MovementDetailDto()
+                .date(DtoTypes.toContractDate(movement.getDate()))
+                .movementType(toContractType(movement.getMovementType()))
+                .value(DtoTypes.toContractAmount(movement.getValue()))
+                .balance(DtoTypes.toContractAmount(movement.getBalance()));
+    }
+
+    // ---------------------------------------------------------------- enums
+
+    private AccountReportDto.AccountTypeEnum toContractType(AccountType accountType) {
+        return accountType == null ? null : AccountReportDto.AccountTypeEnum.fromValue(accountType.name());
+    }
+
+    private MovementDetailDto.MovementTypeEnum toContractType(MovementType movementType) {
+        return movementType == null ? null : MovementDetailDto.MovementTypeEnum.fromValue(movementType.name());
+    }
 }
