@@ -26,8 +26,9 @@ import reactor.core.publisher.Mono;
  * Routes and status codes come from CustomersApi, generated from the OpenAPI
  * contract.
  *
- * El controller no conoce el scheduler: todo trabajo bloqueante (JPA) pasa por
- * BlockingBridge, que lo saca del event loop de WebFlux.
+ * The controller knows nothing about the scheduler: every blocking piece of
+ * work (JPA) goes through BlockingBridge, which takes it off the WebFlux event
+ * loop.
  */
 @RestController
 @RequiredArgsConstructor
@@ -39,8 +40,9 @@ public class CustomerController implements CustomersApi {
     private final BlockingBridge blocking;
 
     @Override
-    public Mono<ResponseEntity<CustomerDto>> createCustomer(Mono<CustomerCreateDto> customerCreateDto,
+    public Mono<ResponseEntity<CustomerDto>> postCustomer(Mono<CustomerCreateDto> customerCreateDto,
             ServerWebExchange exchange) {
+        log.debug("POST /customers");
         return customerCreateDto.map(mapper::toDomain)
                 .flatMap(customer -> blocking.call(() -> service.create(customer)))
                 .map(mapper::toDto)
@@ -61,13 +63,14 @@ public class CustomerController implements CustomersApi {
     @Override
     public Mono<ResponseEntity<Void>> deleteCustomer(UUID customerId, ServerWebExchange exchange) {
         String id = customerId.toString();
+        log.info("DELETE /customers/{}", id);
 
         return blocking.run(() -> service.delete(id))
                 .thenReturn(ResponseEntity.noContent().build());
     }
 
     @Override
-    public Mono<ResponseEntity<CustomerPageDto>> listCustomers(Integer page, Integer size, Boolean status,
+    public Mono<ResponseEntity<CustomerPageDto>> getCustomers(Integer page, Integer size, Boolean status,
             ServerWebExchange exchange) {
         return blocking.call(() -> service.findAll(page, size, status))
                 .map(mapper::toPageDto)
@@ -84,19 +87,19 @@ public class CustomerController implements CustomersApi {
         return customerPatchDto
                 .flatMap(patchDto -> blocking.call(() -> service.patch(id, patchDto)))
                 .map(mapper::toDto)
-                .map(ResponseEntity::ok); // Devolver 200 OK con el cliente actualizado
+                .map(ResponseEntity::ok); // 200 OK with the updated customer
     }
 
     // Update a customer
     @Override
-    public Mono<ResponseEntity<CustomerDto>> updateCustomer(UUID customerId, Mono<CustomerUpdateDto> customerUpdateDto,
+    public Mono<ResponseEntity<CustomerDto>> putCustomer(UUID customerId, Mono<CustomerUpdateDto> customerUpdateDto,
             ServerWebExchange exchange) {
         String id = customerId.toString();
 
         return customerUpdateDto
-                .map(mapper::toDomainUpdate) // Convertir CustomerUpdateDto a Customer
+                .map(mapper::toDomainUpdate) // Turn the CustomerUpdateDto into a Customer
                 .flatMap(customer -> blocking.call(() -> service.update(id, customer)))
                 .map(mapper::toDto)
-                .map(ResponseEntity::ok); // Devolver 200 OK con el cliente actualizado
+                .map(ResponseEntity::ok); // 200 OK with the updated customer
     }
 }

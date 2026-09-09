@@ -33,7 +33,7 @@ paths:
     get:
       tags: [Customers]
       summary: List customers
-      operationId: listCustomers
+      operationId: GetCustomers
       parameters:
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
@@ -59,7 +59,7 @@ paths:
       description: >
         Inserts the person row and the customer row in a single transaction.
         The identifier is generated server-side as a UUID.
-      operationId: createCustomer
+      operationId: PostCustomer
       requestBody:
         required: true
         content:
@@ -102,7 +102,7 @@ paths:
       description: >
         Also used internally by the Account/Movement microservice to
         validate customers and build the account statement report.
-      operationId: getCustomer
+      operationId: GetCustomer
       responses:
         '200':
           description: Customer found
@@ -120,7 +120,7 @@ paths:
       description: >
         Replaces every writable field. The identifier and `createdAt` are never
         modified; `updatedAt` is refreshed by the server.
-      operationId: updateCustomer
+      operationId: PutCustomer
       requestBody:
         required: true
         content:
@@ -148,7 +148,7 @@ paths:
       description: >
         Only the fields present in the body are modified. A field sent as
         `null` is ignored, not cleared.
-      operationId: patchCustomer
+      operationId: PatchCustomer
       requestBody:
         required: true
         content:
@@ -175,7 +175,7 @@ paths:
       summary: Delete a customer
       description: >
         Removes the customer row and its person row (ON DELETE CASCADE).
-      operationId: deleteCustomer
+      operationId: DeleteCustomer
       responses:
         '204':
           description: Customer deleted successfully

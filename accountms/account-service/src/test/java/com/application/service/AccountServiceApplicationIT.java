@@ -7,11 +7,11 @@ import org.springframework.test.context.TestPropertySource;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
-// El contenedor de pruebas crea el esquema con schemas/BaseDatos.sql, asi que
-// Flyway no tiene nada que aplicar: encendido intentaria correr V1 sobre tablas
-// que ya existen.
+// The test container creates the schema from schemas/BaseDatos.sql, so Flyway
+// has nothing to apply: switched on it would try to run V1 over tables that
+// already exist.
 @TestPropertySource(properties = "spring.flyway.enabled=false")
-class AccountServiceApplicationTests {
+class AccountServiceApplicationIT {
 
 	@Test
 	void contextLoads() {

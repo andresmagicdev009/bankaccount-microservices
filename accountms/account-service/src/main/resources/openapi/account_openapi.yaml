@@ -51,7 +51,7 @@ paths:
     get:
       tags: [Accounts]
       summary: List accounts
-      operationId: listAccounts
+      operationId: GetAccounts
       parameters:
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
@@ -78,7 +78,7 @@ paths:
         GET /api/v1/customers/{customerId} on the Customer microservice to
         validate that the customer exists. If that call fails or the
         service does not respond, a 502 is returned (see responses).
-      operationId: createAccount
+      operationId: PostAccount
       requestBody:
         required: true
         content:
@@ -116,7 +116,7 @@ paths:
     get:
       tags: [Accounts]
       summary: Get an account by number
-      operationId: getAccount
+      operationId: GetAccount
       responses:
         '200':
           description: Account found
@@ -131,7 +131,7 @@ paths:
     put:
       tags: [Accounts]
       summary: Update an account (full replacement)
-      operationId: updateAccount
+      operationId: PutAccount
       requestBody:
         required: true
         content:
@@ -154,7 +154,7 @@ paths:
     patch:
       tags: [Accounts]
       summary: Partially update an account
-      operationId: patchAccount
+      operationId: PatchAccount
       requestBody:
         required: true
         content:
@@ -175,7 +175,7 @@ paths:
     delete:
       tags: [Accounts]
       summary: Delete an account
-      operationId: deleteAccount
+      operationId: DeleteAccount
       responses:
         '204':
           description: Account deleted successfully
@@ -197,7 +197,7 @@ paths:
     get:
       tags: [Movements]
       summary: List movements
-      operationId: listMovements
+      operationId: GetMovements
       parameters:
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
@@ -247,7 +247,7 @@ paths:
         CREDIT movement, the value is added to the available balance.
         Every movement is persisted as a transaction record, regardless
         of type.
-      operationId: createMovement
+      operationId: PostMovement
       requestBody:
         required: true
         content:
@@ -300,7 +300,7 @@ paths:
     get:
       tags: [Movements]
       summary: Get a movement by ID
-      operationId: getMovement
+      operationId: GetMovement
       responses:
         '200':
           description: Movement found
@@ -315,7 +315,7 @@ paths:
     put:
       tags: [Movements]
       summary: Update a movement (full replacement)
-      operationId: updateMovement
+      operationId: PutMovement
       requestBody:
         required: true
         content:
@@ -338,7 +338,7 @@ paths:
     patch:
       tags: [Movements]
       summary: Partially update a movement
-      operationId: patchMovement
+      operationId: PatchMovement
       requestBody:
         required: true
         content:
@@ -359,7 +359,7 @@ paths:
     delete:
       tags: [Movements]
       summary: Delete (reverse) a movement
-      operationId: deleteMovement
+      operationId: DeleteMovement
       responses:
         '204':
           description: Movement deleted successfully
@@ -394,7 +394,7 @@ paths:
         Internally, this endpoint combines: (a) accounts and movements data
         owned by this service, and (b) customer data fetched over REST from
         the Customer microservice (GET /api/v1/customers/{customerId}).
-      operationId: generateAccountStatementReport
+      operationId: GetAccountStatementReport
       parameters:
         - name: startDate
           in: query

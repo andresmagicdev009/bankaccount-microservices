@@ -3,14 +3,15 @@ package com.example.customerms.domain.shared.exception;
 import lombok.Getter;
 
 /**
- * Raiz de todas las excepciones de negocio.
+ * Root of every business exception.
  *
- * Lleva dos datos ademas del mensaje: el ErrorType (que status le toca) y un
- * code estable para los logs, que no cambia aunque se reescriba el texto.
+ * It carries two things besides the message: the ErrorType (which status it
+ * maps to) and a stable code for the logs, which does not change even if the
+ * text is rewritten.
  *
- * Es abstracta a proposito: nadie lanza la raiz, siempre una subclase con
- * nombre propio. El advice atrapa DomainException y con eso cubre a todas sus
- * subclases -presentes y futuras- con un unico @ExceptionHandler.
+ * It is abstract on purpose: nobody throws the root, always a subclass with a
+ * name of its own. The advice catches DomainException and thereby covers all of
+ * its subclasses -present and future- with a single @ExceptionHandler.
  */
 @Getter
 public abstract class DomainException extends RuntimeException {
@@ -25,8 +26,8 @@ public abstract class DomainException extends RuntimeException {
     }
 
     /**
-     * Para fallas que envuelven a otra: conserva la causa para que el stacktrace
-     * diga que fallo realmente.
+     * For failures that wrap another one: keeps the cause so the stack trace
+     * says what actually failed.
      */
     protected DomainException(ErrorType type, String code, String message, Throwable cause) {
         super(message, cause);

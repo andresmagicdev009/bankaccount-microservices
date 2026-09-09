@@ -17,26 +17,26 @@ import com.application.service.infrastructure.persistence.jpa.entity.AccountEnti
 import jakarta.persistence.LockModeType;
 
 /**
- * PASO 2.3 - Repositorio Spring Data de cuentas.
+ * Spring Data repository of accounts.
  *
- * findById, save, existsById y deleteById ya los da JpaRepository; aqui solo van
- * los derived queries propios.
+ * findById, save, existsById and deleteById already come from JpaRepository;
+ * only the derived queries of our own live here.
  */
 @Repository
 public interface JpaAccountRepository extends JpaRepository<AccountEntity, String> {
 
     /**
-     * SELECT ... FOR UPDATE sobre la fila de la cuenta.
+     * SELECT ... FOR UPDATE on the row of the account.
      *
-     * Necesario para mover el saldo: leer, sumar y guardar sin bloqueo deja la
-     * ventana clasica del lost update -dos debitos concurrentes, uno pisa al
-     * otro y el saldo puede quedar negativo pese a la regla F3-. Con el bloqueo,
-     * la segunda transaccion espera al COMMIT de la primera y relee el saldo ya
-     * actualizado.
+     * Needed to move the balance: read, add and save without a lock leaves the
+     * classic lost-update window -two concurrent debits, one overwrites the
+     * other and the balance can end up negative despite rule F3-. With the
+     * lock, the second transaction waits for the COMMIT of the first and
+     * re-reads the balance already updated.
      *
-     * Va con @Query explicito porque el @Lock no se puede colgar del findById
-     * heredado de JpaRepository. EXIGE transaccion activa: fuera de una, el
-     * bloqueo se soltaria al instante y no serviria de nada.
+     * It carries an explicit @Query because @Lock cannot be attached to the
+     * findById inherited from JpaRepository. It REQUIRES an active transaction:
+     * outside one, the lock would be released instantly and be useless.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM AccountEntity a WHERE a.accountNumber = :accountNumber")

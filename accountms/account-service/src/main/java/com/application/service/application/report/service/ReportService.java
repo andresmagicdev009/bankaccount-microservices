@@ -24,20 +24,21 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * PASO 5.5 - Caso de uso del estado de cuenta.
+ * Use case of the account statement.
  *
- * Es el unico que combina dos fuentes: lo nuestro (cuentas + movimientos) y lo
- * del microservicio de clientes (nombre e identificacion).
+ * It is the only one combining two sources: ours (accounts + movements) and the
+ * customer microservice (name and identification).
  *
- * Devuelve AccountStatement y no el DTO del contrato para que la capa no quede
- * atada a HTTP: el mismo resultado se pinta como JSON hoy y como Excel manana.
+ * It returns an AccountStatement and not the DTO of the contract so the layer
+ * stays free of HTTP: the same result is rendered as JSON today and as Excel
+ * tomorrow.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ReportService {
 
-    /** Limite inferior cuando no mandan startDate: no hay movimientos antes. */
+    /** Lower bound when no startDate is sent: there are no movements before it. */
     private static final LocalDate OPEN_START = LocalDate.of(1970, 1, 1);
 
     private final AccountRepositoryPort accountRepository;
@@ -45,10 +46,10 @@ public class ReportService {
     private final CustomerLookupPort customerLookup;
 
     /**
-     * Las dos fechas son opcionales en el contrato: sin startDate el rango
-     * arranca abierto y sin endDate termina hoy. El estado de cuenta viaja con
-     * las fechas efectivas, no con los nulos, para que el reporte diga siempre
-     * que periodo cubre.
+     * Both dates are optional in the contract: without startDate the range
+     * starts open and without endDate it ends today. The statement travels with
+     * the effective dates, not with the nulls, so the report always states
+     * which period it covers.
      */
     @Transactional(readOnly = true)
     public AccountStatement generate(String customerId, LocalDate startDate, LocalDate endDate) {
@@ -56,19 +57,19 @@ public class ReportService {
         LocalDate from = startDate != null ? startDate : OPEN_START;
         LocalDate until = endDate != null ? endDate : LocalDate.now();
 
-        // a) Rango imposible: se rechaza antes de tocar la base.
+        // a) Impossible range: rejected before touching the database.
         if (from.isAfter(until)) {
             throw new InvalidDateRangeException(from, until);
         }
 
-        // b) El nombre y la identificacion viven en el otro microservicio.
-        //    Vacio -> 404. Si ese servicio esta caido, el adapter lanza la de 502
-        //    y aqui NO se captura a proposito.
+        // b) The name and the identification live in the other microservice.
+        //    Empty -> 404. If that service is down, the adapter throws the 502
+        //    one and it is deliberately NOT caught here.
         CustomerSnapshot customer = customerLookup.findById(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
-        // c) Un cliente sin cuentas no tiene estado de cuenta que emitir. El
-        //    contrato une los dos casos bajo el mismo 404:
+        // c) A customer with no accounts has no statement to issue. The
+        //    contract folds both cases under the same 404:
         //    "The customer does not exist ... or has no associated accounts".
         List<Account> accounts = accountRepository.findByCustomerId(customerId);
         if (accounts.isEmpty()) {
@@ -76,9 +77,10 @@ public class ReportService {
             throw new CustomerNotFoundException(customerId);
         }
 
-        // d) Los movimientos viajan aparte porque Account no los contiene: son dos
-        //    agregados distintos y solo el reporte necesita verlos juntos.
-        //    LinkedHashMap para que el orden de las cuentas sea reproducible.
+        // d) The movements travel apart because Account does not contain them:
+        //    they are two different aggregates and only the report needs to see
+        //    them together. LinkedHashMap keeps the order of the accounts
+        //    reproducible.
         LocalDateTime rangeStart = from.atStartOfDay();
         LocalDateTime rangeEnd = until.atTime(LocalTime.MAX);
 
@@ -92,7 +94,7 @@ public class ReportService {
         log.info("Statement generated for customer {} [{} .. {}]: {} accounts",
                 customerId, from, until, accounts.size());
 
-        // e) El servicio responde QUE datos; ReportMapper decidira COMO se ven.
+        // e) The service answers WHICH data; ReportMapper will decide HOW it looks.
         return AccountStatement.builder()
                 .customer(customer)
                 .startDate(from)

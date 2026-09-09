@@ -10,41 +10,41 @@ import org.testcontainers.utility.MountableFile;
 import com.application.service.it.support.DeliverableSchema;
 
 /**
- * Base de datos de las pruebas de integracion.
+ * Database used by the integration tests.
  *
- * Dos decisiones que no son cosmeticas:
+ * Two decisions that are not cosmetic:
  *
- * 1. La imagen es mariadb, no mysql. El motor real del proyecto es MariaDB en
- *    los dos entornos -XAMPP en local, mariadb:11.4 en docker-compose- y el
- *    dialecto configurado es MariaDBDialect por el "FOR UPDATE" del bloqueo
- *    pesimista. Probar sobre MySQL 8 validaria un motor que no se usa.
- *    Se instancia con MySQLContainer -no con MariaDBContainer- a proposito:
- *    asi la url sigue siendo jdbc:mysql:// y el driver sigue siendo
- *    mysql-connector-j, exactamente como en produccion.
+ * 1. The image is mariadb, not mysql. The real engine of the project is MariaDB
+ *    in both environments -XAMPP locally, mariadb:11.4 in docker-compose- and
+ *    the configured dialect is MariaDBDialect because of the "FOR UPDATE" of
+ *    the pessimistic lock. Testing on MySQL 8 would validate an engine that is
+ *    never used. It is instantiated through MySQLContainer -not
+ *    MariaDBContainer- on purpose: that keeps the url as jdbc:mysql:// and the
+ *    driver as mysql-connector-j, exactly as in production.
  *
- * 2. El esquema lo crea schemas/BaseDatos.sql, el entregable de la prueba
- *    tecnica, montado en el directorio de arranque del contenedor. Flyway va
- *    apagado en la suite (ver AbstractIntegrationTest): si estuviera encendido
- *    intentaria aplicar V1 sobre tablas que ya existen.
+ * 2. The schema is created by schemas/BaseDatos.sql, the deliverable of the
+ *    technical test, mounted in the startup directory of the container. Flyway
+ *    is switched off in the suite (see AbstractIntegrationTest): switched on it
+ *    would try to apply V1 over tables that already exist.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
-    /** El entrypoint de la imagen ejecuta como root todo lo que haya aqui. */
+    /** The entrypoint of the image runs everything placed here as root. */
     public static final String INIT_SCRIPT_PATH = "/docker-entrypoint-initdb.d/01-BaseDatos.sql";
 
     /**
-     * La version se fija a la del docker-compose. Nada de "latest": una imagen
-     * movil convierte un build reproducible en uno que depende del dia.
+     * The version is pinned to the docker-compose one. No "latest": a moving
+     * image turns a reproducible build into one that depends on the day.
      */
     private static final DockerImageName IMAGE = DockerImageName
             .parse("mariadb:11.4")
             .asCompatibleSubstituteFor("mysql");
 
     /**
-     * El nombre de la base tiene que ser el mismo que usa el script -accounts_ms-
-     * o el entrypoint crearia "test" y el GRANT del usuario de pruebas no
-     * alcanzaria a las tablas del entregable.
+     * The database name has to be the one the script uses -accounts_ms- or the
+     * entrypoint would create "test" and the GRANT of the test user would not
+     * reach the tables of the deliverable.
      */
     @Bean
     @ServiceConnection

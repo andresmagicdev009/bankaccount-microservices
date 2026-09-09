@@ -45,25 +45,25 @@ import com.application.service.domain.movement.repository.MovementRepositoryPort
 import com.application.service.domain.shared.exception.InvalidDateRangeException;
 
 /**
- * Pruebas unitarias de MovementService: reglas F2 y F3 del enunciado.
+ * Unit tests for MovementService: rules F2 and F3 of the specification.
  *
- * MovementHelpers se usa REAL, no mockeado, con los dos puertos doblados. Es a
- * proposito: la aritmetica del saldo vive en applyToBalance, y mockear el
- * helper convertiria estas pruebas en "el servicio llama al helper" -algo que
- * ya se ve leyendo el codigo- en vez de comprobar que la cuenta suma y resta
- * bien de verdad.
+ * MovementHelpers is used FOR REAL, not mocked, with both ports doubled. That
+ * is on purpose: the arithmetic of the balance lives in applyToBalance, and
+ * mocking the helper would turn these tests into "the service calls the helper"
+ * -something already visible by reading the code- instead of checking that the
+ * account really adds and subtracts correctly.
  *
- * Desde que available_balance es columna de account, applyToBalance no solo
- * valida: tambien escribe el saldo en la cuenta. Por eso varias pruebas miran
- * las dos caras -el movimiento y la fila de la cuenta-.
+ * Since available_balance became a column of account, applyToBalance does not
+ * only validate: it also writes the balance onto the account. That is why
+ * several tests look at both sides -the movement and the account row-.
  *
- * Mapa regla -> prueba:
- *   F2 el valor debe ser mayor que cero ... Create.valorNoPositivoSeRechaza
- *   F2 el debito resta ................... Create.debitoRestaDelSaldoDisponible
- *   F2 el credito suma ................... Create.creditoSumaAlSaldoDisponible
- *   F2 se registra cada transaccion ...... Create.registraLaTransaccionCompleta
- *                                          Create.encadenaSobreElSaldoDelUltimo
- *   F3 "Saldo no disponible" ............. SaldoNoDisponible.*
+ * Rule -> test map:
+ *   F2 the value must be greater than zero .. Create.nonPositiveValueIsRejected
+ *   F2 a debit subtracts .................... Create.debitSubtractsFromAvailableBalance
+ *   F2 a credit adds ........................ Create.creditAddsToAvailableBalance
+ *   F2 every transaction is recorded ........ Create.recordsTheWholeTransaction
+ *                                             Create.chainsOnTheBalanceOfTheLastOne
+ *   F3 "Saldo no disponible" ................ InsufficientBalance.*
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("MovementService")
@@ -73,7 +73,7 @@ class MovementServiceTest {
     private static final String CUSTOMER_ID = "CUS-1";
     private static final String MOVEMENT_ID = "11111111-1111-1111-1111-111111111111";
 
-    /** Texto literal que exige la regla F3. No se traduce ni se adorna. */
+    /** Literal text required by rule F3. It is neither translated nor decorated. */
     private static final String SALDO_NO_DISPONIBLE = "Saldo no disponible";
 
     @Mock
@@ -94,12 +94,12 @@ class MovementServiceTest {
 
     // ------------------------------------------------------------------- FIXTURES
 
-    /** Cuenta 225487 del enunciado: se abre con 100 y todavia no ha operado. */
+    /** Account 225487 of the specification: opened with 100 and idle so far. */
     private Account account() {
         return account("100.00");
     }
 
-    /** La misma cuenta, con el saldo disponible que tenga en ese momento. */
+    /** The same account, with whatever available balance it holds at that point. */
     private Account account(String availableBalance) {
         return Account.builder()
                 .accountNumber(ACCOUNT_NUMBER)
@@ -119,7 +119,7 @@ class MovementServiceTest {
                 .build();
     }
 
-    /** Movimiento ya persistido, con su id, su fecha y su balance historico. */
+    /** An already persisted movement, with its id, its date and its historical balance. */
     private Movement persistedMovement(MovementType type, String value, String balance) {
         return Movement.builder()
                 .movementId(MOVEMENT_ID)
@@ -132,14 +132,14 @@ class MovementServiceTest {
     }
 
     /**
-     * La cuenta existe con ese saldo disponible.
+     * The account exists with that available balance.
      *
-     * Devuelve la instancia para poder afirmar sobre ella despues: es la misma
-     * que applyToBalance muta y manda a persistir, asi que su availableBalance
-     * es exactamente lo que se escribiria en la columna.
+     * It returns the instance so it can be asserted on afterwards: it is the
+     * very one applyToBalance mutates and sends to be persisted, so its
+     * availableBalance is exactly what would be written into the column.
      *
-     * No hace falta doblar la escritura del saldo: applyToBalance ignora lo que
-     * devuelva updateAvailableBalance.
+     * There is no need to double the balance write: applyToBalance ignores
+     * whatever updateAvailableBalance returns.
      */
     private Account givenAccount(String availableBalance) {
         Account account = account(availableBalance);
@@ -147,7 +147,7 @@ class MovementServiceTest {
         return account;
     }
 
-    /** Igual, y ademas el repositorio de movimientos devuelve lo que se le guarda. */
+    /** The same, plus the movement repository returns whatever is saved into it. */
     private Account givenAccountWithBalance(String availableBalance) {
         Account account = givenAccount(availableBalance);
         when(movementRepository.save(any(Movement.class))).thenAnswer(call -> call.getArgument(0));
@@ -161,9 +161,9 @@ class MovementServiceTest {
     class Create {
 
         @Test
-        @DisplayName("un credito SUMA al saldo disponible")
-        void creditoSumaAlSaldoDisponible() {
-            // available_balance null: fila anterior a la columna, cae al de apertura.
+        @DisplayName("a credit ADDS to the available balance")
+        void creditAddsToAvailableBalance() {
+            // available_balance null: a row predating the column, it falls back to the opening one.
             Account account = givenAccountWithBalance(null);
 
             Movement result = movementService.create(newMovement(MovementType.CREDIT, "600.00"));
@@ -173,8 +173,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("un debito RESTA del saldo disponible")
-        void debitoRestaDelSaldoDisponible() {
+        @DisplayName("a debit SUBTRACTS from the available balance")
+        void debitSubtractsFromAvailableBalance() {
             Account account = givenAccountWithBalance("2000.00");
 
             Movement result = movementService.create(newMovement(MovementType.DEBIT, "575.00"));
@@ -184,8 +184,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("registra la transaccion completa: id, fecha y saldo resultante")
-        void registraLaTransaccionCompleta() {
+        @DisplayName("records the whole transaction: id, date and resulting balance")
+        void recordsTheWholeTransaction() {
             givenAccountWithBalance("1000.00");
 
             movementService.create(newMovement(MovementType.DEBIT, "250.00"));
@@ -193,22 +193,22 @@ class MovementServiceTest {
             verify(movementRepository).save(savedMovement.capture());
             Movement persisted = savedMovement.getValue();
 
-            // Los tres campos readOnly del contrato los pone el servidor, no el cliente.
+            // The three readOnly fields of the contract are set by the server, not the client.
             assertThat(persisted.getMovementId()).isNotBlank();
             assertThat(UUID.fromString(persisted.getMovementId())).isNotNull();
             assertThat(persisted.getDate()).isNotNull();
             assertThat(persisted.getBalance()).isEqualByComparingTo("750.00");
 
-            // Y lo que si mando el cliente sigue intacto.
+            // And what the client did send stays untouched.
             assertThat(persisted.getAccountNumber()).isEqualTo(ACCOUNT_NUMBER);
             assertThat(persisted.getMovementType()).isEqualTo(MovementType.DEBIT);
             assertThat(persisted.getValue()).isEqualByComparingTo("250.00");
         }
 
         @Test
-        @DisplayName("el segundo movimiento parte del saldo del anterior, no del inicial")
-        void encadenaSobreElSaldoDelUltimo() {
-            // La cuenta abrio con 100 pero ya opero y quedo en 700.
+        @DisplayName("the second movement starts from the previous balance, not from the initial one")
+        void chainsOnTheBalanceOfTheLastOne() {
+            // The account opened with 100 but already moved money and sits at 700.
             Account account = givenAccountWithBalance("700.00");
 
             Movement result = movementService.create(newMovement(MovementType.CREDIT, "150.00"));
@@ -218,8 +218,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("un debito que deja el saldo exactamente en cero se acepta")
-        void debitoExactoDejaElSaldoEnCero() {
+        @DisplayName("a debit leaving the balance exactly at zero is accepted")
+        void exactDebitLeavesBalanceAtZero() {
             Account account = givenAccountWithBalance("540.00");
 
             Movement result = movementService.create(newMovement(MovementType.DEBIT, "540.00"));
@@ -231,8 +231,8 @@ class MovementServiceTest {
         @ParameterizedTest(name = "valor = {0}")
         @NullSource
         @ValueSource(strings = { "0", "0.00", "-0.01", "-100.00" })
-        @DisplayName("el valor debe ser mayor que cero: se rechaza sin tocar la BD")
-        void valorNoPositivoSeRechaza(String value) {
+        @DisplayName("the value must be greater than zero: rejected without touching the database")
+        void nonPositiveValueIsRejected(String value) {
             Movement movement = Movement.builder()
                     .accountNumber(ACCOUNT_NUMBER)
                     .movementType(MovementType.CREDIT)
@@ -242,15 +242,15 @@ class MovementServiceTest {
             assertThatThrownBy(() -> movementService.create(movement))
                     .isInstanceOf(InvalidMovementValueException.class);
 
-            // Entrada invalida (400): se corta antes de mirar siquiera la cuenta.
+            // Invalid input (400): it stops before even looking at the account.
             verify(accountRepository, never()).findByAccountNumberForUpdate(anyString());
             verify(accountRepository, never()).updateAvailableBalance(anyString(), any());
             verify(movementRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("cuenta inexistente: 404 y no se registra nada")
-        void cuentaInexistente() {
+        @DisplayName("unknown account: 404 and nothing is recorded")
+        void unknownAccount() {
             when(accountRepository.findByAccountNumberForUpdate("NO-EXISTE")).thenReturn(Optional.empty());
 
             Movement movement = Movement.builder()
@@ -269,12 +269,12 @@ class MovementServiceTest {
     // ----------------------------------------------------------------------- F3
 
     @Nested
-    @DisplayName("F3 - saldo no disponible")
-    class SaldoNoDisponible {
+    @DisplayName("F3 - insufficient balance")
+    class InsufficientBalance {
 
         @Test
-        @DisplayName("debito mayor que el saldo: mensaje literal \"Saldo no disponible\"")
-        void mensajeLiteralDelEnunciado() {
+        @DisplayName("debit greater than the balance: literal message \"Saldo no disponible\"")
+        void literalMessageOfTheSpecification() {
             givenAccount("100.00");
 
             assertThatThrownBy(() -> movementService.create(newMovement(MovementType.DEBIT, "1000.00")))
@@ -283,33 +283,33 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("el error viaja con codigo estable INSUFFICIENT_BALANCE")
-        void codigoEstableParaElCliente() {
+        @DisplayName("the error travels with the stable code INSUFFICIENT_BALANCE")
+        void stableCodeForTheClient() {
             givenAccount("100.00");
 
             InsufficientBalanceException ex = catchInsufficientBalance(
                     () -> movementService.create(newMovement(MovementType.DEBIT, "1000.00")));
 
-            // El cliente puede ramificar por el code sin parsear el texto,
-            // que GlobalExceptionHandler devuelve como 422.
+            // A client can branch on the code without parsing the text, which
+            // GlobalExceptionHandler returns as a 422.
             assertThat(ex.getCode()).isEqualTo("INSUFFICIENT_BALANCE");
         }
 
         @Test
-        @DisplayName("el mensaje no filtra ni el saldo disponible ni el solicitado")
-        void noFiltraDetalleAlCliente() {
+        @DisplayName("the message leaks neither the available balance nor the requested one")
+        void doesNotLeakDetailToTheClient() {
             givenAccount("100.00");
 
             InsufficientBalanceException ex = catchInsufficientBalance(
                     () -> movementService.create(newMovement(MovementType.DEBIT, "1000.00")));
 
-            // El detalle va al log; el cuerpo de la respuesta solo lleva el literal.
+            // The detail goes to the log; the response body carries only the literal.
             assertThat(ex.getMessage()).doesNotContain("100").doesNotContain("1000");
         }
 
         @Test
-        @DisplayName("un centavo de mas ya no alcanza")
-        void unCentavoDeMasNoAlcanza() {
+        @DisplayName("one cent too many is already too much")
+        void oneCentTooManyIsNotEnough() {
             givenAccount("100.00");
 
             assertThatThrownBy(() -> movementService.create(newMovement(MovementType.DEBIT, "100.01")))
@@ -317,29 +317,29 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("el movimiento rechazado NO se registra")
-        void elMovimientoRechazadoNoSeRegistra() {
+        @DisplayName("the rejected movement is NOT recorded")
+        void rejectedMovementIsNotRecorded() {
             givenAccount("100.00");
 
             assertThatThrownBy(() -> movementService.create(newMovement(MovementType.DEBIT, "1000.00")))
                     .isInstanceOf(InsufficientBalanceException.class);
 
-            // Ni el movimiento ni el nuevo saldo de la cuenta llegan a persistirse.
+            // Neither the movement nor the new account balance ever gets persisted.
             verify(movementRepository, never()).save(any());
             verify(accountRepository, never()).updateAvailableBalance(anyString(), any());
         }
 
         @Test
-        @DisplayName("editar un movimiento hasta dejar el saldo negativo tambien se bloquea")
-        void editarHastaSaldoNegativoTambienSeBloquea() {
-            // Cuenta abierta con 100, un unico debito de 50: saldo disponible 50.
+        @DisplayName("editing a movement into a negative balance is blocked as well")
+        void editingIntoNegativeBalanceIsBlockedToo() {
+            // Account opened with 100, a single debit of 50: available balance 50.
             Movement existing = persistedMovement(MovementType.DEBIT, "50.00", "50.00");
 
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(existing));
             when(movementRepository.findLatest(ACCOUNT_NUMBER)).thenReturn(Optional.of(existing));
             givenAccount("50.00");
 
-            // Subir el debito a 500: delta -450 sobre 50 -> -400.
+            // Raising the debit to 500: delta -450 over 50 -> -400.
             assertThatThrownBy(() -> movementService.patch(MOVEMENT_ID, null, new BigDecimal("500.00")))
                     .isInstanceOf(InsufficientBalanceException.class)
                     .hasMessage(SALDO_NO_DISPONIBLE);
@@ -365,9 +365,9 @@ class MovementServiceTest {
     class UpdateAndPatch {
 
         @Test
-        @DisplayName("subir el valor de un debito recompone el saldo por el delta")
-        void subirElValorRecomponeElSaldo() {
-            // Cuenta en 900 tras un debito de 100. Subirlo a 300 -> delta -200 -> 700.
+        @DisplayName("raising the value of a debit recomposes the balance by the delta")
+        void raisingTheValueRecomposesTheBalance() {
+            // Account at 900 after a debit of 100. Raising it to 300 -> delta -200 -> 700.
             Movement existing = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
 
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(existing));
@@ -382,9 +382,9 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("cambiar DEBIT por CREDIT invierte el signo del movimiento")
-        void cambiarDeDebitoACreditoInvierteElSigno() {
-            // 900 tras un debito de 100. Pasarlo a credito -> delta +200 -> 1100.
+        @DisplayName("swapping DEBIT for CREDIT flips the sign of the movement")
+        void swappingDebitForCreditFlipsTheSign() {
+            // 900 after a debit of 100. Turning it into a credit -> delta +200 -> 1100.
             Movement existing = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
 
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(existing));
@@ -399,8 +399,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("patch sin campos: devuelve el movimiento sin tocar la BD")
-        void patchSinCamposNoEscribe() {
+        @DisplayName("patch with no fields: returns the movement without touching the database")
+        void patchWithNoFieldsDoesNotWrite() {
             Movement existing = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(existing));
 
@@ -411,8 +411,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("solo se puede editar el ultimo movimiento de la cuenta")
-        void soloElUltimoMovimientoEsEditable() {
+        @DisplayName("only the last movement of the account can be edited")
+        void onlyTheLastMovementIsEditable() {
             Movement intermediate = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
             Movement last = Movement.builder()
                     .movementId("22222222-2222-2222-2222-222222222222")
@@ -432,8 +432,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("movimiento inexistente: 404")
-        void movimientoInexistente() {
+        @DisplayName("unknown movement: 404")
+        void unknownMovement() {
             when(movementRepository.findById("NO-EXISTE")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> movementService.update("NO-EXISTE",
@@ -442,8 +442,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("update tampoco acepta un valor de cero o negativo")
-        void updateRechazaValorNoPositivo() {
+        @DisplayName("update does not accept a zero or negative value either")
+        void updateRejectsNonPositiveValue() {
             Movement existing = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(existing));
 
@@ -463,9 +463,9 @@ class MovementServiceTest {
     class Delete {
 
         @Test
-        @DisplayName("borrar un debito devuelve su valor al saldo disponible")
-        void borrarUnDebitoDevuelveElSaldo() {
-            // La cuenta esta en 900 por culpa de este debito de 100.
+        @DisplayName("deleting a debit gives its value back to the available balance")
+        void deletingADebitGivesTheBalanceBack() {
+            // The account sits at 900 because of this debit of 100.
             Movement last = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
 
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(last));
@@ -479,8 +479,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("borrar un credito lo resta del saldo disponible")
-        void borrarUnCreditoRestaDelSaldo() {
+        @DisplayName("deleting a credit subtracts it from the available balance")
+        void deletingACreditSubtractsFromTheBalance() {
             Movement last = persistedMovement(MovementType.CREDIT, "600.00", "700.00");
 
             when(movementRepository.findById(MOVEMENT_ID)).thenReturn(Optional.of(last));
@@ -489,13 +489,13 @@ class MovementServiceTest {
 
             movementService.delete(MOVEMENT_ID);
 
-            // Vuelve al saldo que habia antes del credito: el de apertura.
+            // It returns to the balance held before the credit: the opening one.
             assertThat(account.getAvailableBalance()).isEqualByComparingTo("100.00");
         }
 
         @Test
-        @DisplayName("un movimiento intermedio no se puede borrar")
-        void noBorraUnoIntermedio() {
+        @DisplayName("a movement in the middle cannot be deleted")
+        void doesNotDeleteOneInTheMiddle() {
             Movement intermediate = persistedMovement(MovementType.DEBIT, "100.00", "900.00");
             Movement last = Movement.builder()
                     .movementId("33333333-3333-3333-3333-333333333333")
@@ -523,8 +523,8 @@ class MovementServiceTest {
     class ListMovements {
 
         @Test
-        @DisplayName("filtra por las cuentas del cliente y cubre el dia final completo")
-        void filtraPorClienteYRangoDeFechas() {
+        @DisplayName("filters by the accounts of the customer and covers the whole final day")
+        void filtersByCustomerAndDateRange() {
             ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
             ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
             @SuppressWarnings("unchecked")
@@ -542,13 +542,13 @@ class MovementServiceTest {
 
             assertThat(accounts.getValue()).containsExactly(ACCOUNT_NUMBER);
             assertThat(from.getValue()).isEqualTo(LocalDate.of(2026, 2, 1).atStartOfDay());
-            // Sin esto se perderian los movimientos del propio 28.
+            // Without this, the movements of the 28th itself would be lost.
             assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 2, 28, 23, 59, 59, 999_999_999));
         }
 
         @Test
-        @DisplayName("cliente sin cuentas: pagina vacia sin consultar movimientos")
-        void clienteSinCuentasDevuelvePaginaVacia() {
+        @DisplayName("customer with no accounts: empty page without querying movements")
+        void customerWithNoAccountsReturnsEmptyPage() {
             when(accountRepository.findByCustomerId("CUS-SIN-CUENTAS")).thenReturn(List.of());
 
             Page<Movement> page = movementService.list(null, "CUS-SIN-CUENTAS", null, null, 0, 10);
@@ -558,8 +558,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("rango invertido: 400 y no se consulta la BD")
-        void rangoInvertido() {
+        @DisplayName("inverted range: 400 and the database is not queried")
+        void invertedRange() {
             assertThatThrownBy(() -> movementService.list(null, null,
                     LocalDate.of(2026, 3, 1), LocalDate.of(2026, 2, 1), 0, 10))
                     .isInstanceOf(InvalidDateRangeException.class);
@@ -568,8 +568,8 @@ class MovementServiceTest {
         }
 
         @Test
-        @DisplayName("sin customerId no se consultan cuentas: el filtro queda en null")
-        void sinCustomerIdNoFiltraPorCuentas() {
+        @DisplayName("without customerId no accounts are queried: the filter stays null")
+        void withoutCustomerIdNoAccountFilter() {
             @SuppressWarnings("unchecked")
             ArgumentCaptor<List<String>> accounts = ArgumentCaptor.forClass(List.class);
 

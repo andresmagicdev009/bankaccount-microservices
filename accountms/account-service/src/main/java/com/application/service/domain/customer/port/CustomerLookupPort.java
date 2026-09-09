@@ -5,18 +5,16 @@ import java.util.Optional;
 import com.application.service.domain.customer.entity.CustomerSnapshot;
 
 /**
- * PASO 1.8 - Puerto de salida hacia el microservicio de clientes.
+ * Outbound port towards the customer microservice.
  *
- * El dominio no sabe que existe WebClient ni HTTP: solo sabe que "alguien" le
- * puede resolver un cliente por id. La implementacion va en infrastructure.
+ * The domain does not know that WebClient or HTTP exist: it only knows that
+ * "somebody" can resolve a customer by id. The implementation lives in
+ * infrastructure.
  *
- * TODO: declara
- *       Optional<CustomerSnapshot> findById(String customerId);
- *
- *       Contrato del metodo (importante para los codigos HTTP):
- *         - cliente inexistente (404 arriba)  -> Optional.empty()
- *         - timeout / conexion rechazada / 5xx -> lanza CustomerServiceUnavailableException
- *       Esa distincion es la que despues se traduce a 404 vs 502.
+ * Contract of the method (it drives the HTTP codes):
+ *   - unknown customer (a 404 upstream)   -> Optional.empty()
+ *   - timeout / refused connection / 5xx  -> throws CustomerServiceUnavailableException
+ * That distinction is what is later translated into 404 vs 502.
  */
 public interface CustomerLookupPort {
     Optional<CustomerSnapshot> findById(String customerId);

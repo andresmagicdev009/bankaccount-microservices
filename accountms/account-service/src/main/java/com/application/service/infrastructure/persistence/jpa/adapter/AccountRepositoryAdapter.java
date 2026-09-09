@@ -20,11 +20,11 @@ import com.application.service.infrastructure.persistence.jpa.repository.JpaMove
 import lombok.RequiredArgsConstructor;
 
 /**
- * PASO 2.7 - Implementacion de AccountRepositoryPort sobre Spring Data.
+ * Implementation of AccountRepositoryPort on top of Spring Data.
  *
- * Aqui se cierra la inversion de dependencias: el dominio definio la interfaz,
- * infraestructura la implementa, Spring inyecta esta clase donde el servicio
- * pide el puerto. Ninguna AccountEntity sale de esta clase.
+ * This is where the dependency inversion closes: the domain defined the
+ * interface, infrastructure implements it, Spring injects this class wherever
+ * the service asks for the port. No AccountEntity ever leaves this class.
  */
 @Component
 @RequiredArgsConstructor
@@ -35,9 +35,9 @@ public class AccountRepositoryAdapter implements AccountRepositoryPort {
     private final AccountPersistenceMapper mapper;
 
     /**
-     * Insert vs update explicito. Un save() ciego con PK asignada a mano haria
-     * merge y pisaria createdAt con null; buscando primero la entidad
-     * administrada, updateEntity solo toca el estado mutable.
+     * Explicit insert vs update. A blind save() with a hand-assigned PK would
+     * merge and overwrite createdAt with null; by looking up the managed entity
+     * first, updateEntity only touches the mutable state.
      */
     @Override
     public Account save(Account account) {
@@ -66,11 +66,12 @@ public class AccountRepositoryAdapter implements AccountRepositoryPort {
     }
 
     /**
-     * Unico UPDATE que toca available_balance.
+     * The only UPDATE touching available_balance.
      *
-     * Si la fila ya venia cargada en esta transaccion -lo normal: el llamador la
-     * leyo con bloqueo-, findById la saca del contexto de persistencia sin
-     * volver a la base y sin soltar el bloqueo.
+     * If the row was already loaded in this transaction -the usual case: the
+     * caller read it with a lock-, findById takes it from the persistence
+     * context without going back to the database and without releasing the
+     * lock.
      */
     @Override
     public void updateAvailableBalance(String accountNumber, BigDecimal availableBalance) {
@@ -102,9 +103,9 @@ public class AccountRepositoryAdapter implements AccountRepositoryPort {
     }
 
     /**
-     * Borrado explicito de los movimientos antes de la cuenta: no se delega en el
-     * ON DELETE CASCADE de la base. Asi el comportamiento es el mismo con
-     * cualquier motor y queda visible en el codigo.
+     * Explicit deletion of the movements before the account: the ON DELETE
+     * CASCADE of the database is not relied upon. That way the behaviour is the
+     * same on any engine and stays visible in the code.
      */
     @Override
     @Transactional

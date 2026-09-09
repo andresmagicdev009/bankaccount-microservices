@@ -1,0 +1,5 @@
+# Local environment: holds the database credentials Compose injects.
+# Committed as .env.example instead; copy it to .env before running.
+.env
+.env.local
+.env.*.local

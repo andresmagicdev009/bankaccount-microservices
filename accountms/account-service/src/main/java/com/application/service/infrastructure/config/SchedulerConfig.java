@@ -8,18 +8,18 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * PASO 3.1 - Scheduler para el trabajo bloqueante.
+ * Scheduler for the blocking work.
  *
- * El proyecto es WebFlux (event loop de pocos hilos) pero la persistencia es JPA
- * (bloqueante). Llamar JPA en el event loop bloquea el servidor entero; los
- * controllers empujan ese trabajo aqui con subscribeOn(jdbcScheduler).
+ * The project is WebFlux (an event loop with few threads) but persistence is
+ * JPA (blocking). Calling JPA on the event loop blocks the whole server; the
+ * controllers push that work here with subscribeOn(jdbcScheduler).
  */
 @Configuration
 public class SchedulerConfig {
 
     /**
-     * Tantos hilos como conexiones tenga Hikari: mas hilos solo harian cola
-     * esperando una conexion libre.
+     * As many threads as Hikari has connections: more threads would only queue
+     * up waiting for a free connection.
      */
     @Bean
     public Scheduler jdbcScheduler(

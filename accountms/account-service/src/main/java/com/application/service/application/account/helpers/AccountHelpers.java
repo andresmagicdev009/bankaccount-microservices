@@ -8,48 +8,49 @@ import com.application.service.domain.account.repository.AccountRepositoryPort;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Generador de numeros de cuenta.
+ * Account number generator.
  *
- * Un contador crudo publica cuanta actividad tiene el banco -si abro dos
- * cuentas y salen 41 y 58, se cuantas se crearon en medio-. Aqui el contador se
- * pasa por una red de Feistel, que es una PERMUTACION del dominio: cada valor
- * de la secuencia da un numero distinto, sin colisiones y sin consultar la
- * base ni una sola vez.
+ * A raw counter publishes how much activity the bank has -open two accounts,
+ * get 41 and 58, and you know how many were created in between-. Here the
+ * counter goes through a Feistel network, which is a PERMUTATION of the domain:
+ * each value of the sequence yields a different number, with no collisions and
+ * without querying the database even once.
  *
- * No es cifrado: las claves estan en el codigo y el dominio es pequeno. Solo
- * evita que el numero se lea como un contador.
+ * It is not encryption: the keys are in the code and the domain is small. It
+ * only keeps the number from reading as a counter.
  *
- * Es @Component y no interface porque necesita el puerto de la secuencia
- * inyectado. Y es concreta, no abstract: Spring no puede instanciar una
- * clase abstracta, asi que con abstract nunca llegaria a ser un bean.
+ * It is a @Component and not an interface because it needs the sequence port
+ * injected. And it is concrete, not abstract: Spring cannot instantiate an
+ * abstract class, so as abstract it would never become a bean.
  */
 @Component
 @RequiredArgsConstructor
 public class AccountHelpers {
 
-    private static final int HALF = 10_000; // raiz del dominio
-    private static final int DOMAIN = HALF * HALF; // 100.000.000 cuentas
+    private static final int HALF = 10_000; // square root of the domain
+    private static final int DOMAIN = HALF * HALF; // 100,000,000 accounts
 
     /**
-     * Desplaza el resultado fuera del rango que empieza en cero.
+     * Shifts the result out of the range starting at zero.
      *
-     * Vale DOMAIN y no 100_000 a proposito: asi el rango final es
-     * [100.000.000, 199.999.999], siempre 9 digitos. Con un origen menor los
-     * numeros saldrian de ancho variable -de 6 a 9 digitos- segun el valor.
+     * It is DOMAIN and not 100_000 on purpose: that makes the final range
+     * [100,000,000, 199,999,999], always 9 digits. With a smaller origin the
+     * numbers would come out with a variable width -6 to 9 digits- depending on
+     * the value.
      */
     private static final int ACCOUNT_NUMBER_ORIGIN = DOMAIN;
 
-    /** Una clave por ronda: su cantidad ES el numero de rondas. */
+    /** One key per round: how many there are IS the number of rounds. */
     private static final int[] ROUND_KEYS = { 0x5bf03635, 0x2c9277b5, 0x1b873593, 0x7feb352d };
 
     private final AccountRepositoryPort accountNumberSequence;
 
     /**
-     * Siguiente numero de cuenta.
+     * Next account number.
      *
-     * No comprueba contra la base que este libre: la red es biyectiva sobre
-     * [0, DOMAIN), asi que dos valores distintos de la secuencia no pueden
-     * producir el mismo numero.
+     * It does not check against the database that the number is free: the
+     * network is bijective over [0, DOMAIN), so two different values of the
+     * sequence cannot produce the same number.
      */
     public String nextAccountNumber() {
         long seq = accountNumberSequence.nextAccountNumberSequenceValue(); // SELECT nextval(...)
@@ -62,15 +63,15 @@ public class AccountHelpers {
     }
 
     /**
-     * Red de Feistel balanceada.
+     * Balanced Feistel network.
      *
-     * Cada ronda es invertible -de (R, L+F(R)) se recupera (L, R)- y la suma es
-     * modulo HALF, asi que la composicion de las cuatro rondas permuta el
-     * dominio exactamente. De ahi que no haga falta buscar duplicados.
+     * Every round is invertible -from (R, L+F(R)) you recover (L, R)- and the
+     * addition is modulo HALF, so the composition of the four rounds permutes
+     * the domain exactly. Hence there is no need to look for duplicates.
      *
-     * 0x9E3779B1 es la proporcion aurea en 32 bits, la constante clasica de
-     * dispersion de Knuth. Va en long para que el producto no desborde antes
-     * del modulo.
+     * 0x9E3779B1 is the golden ratio in 32 bits, the classic Knuth hashing
+     * constant. It is a long so the product does not overflow before the
+     * modulo.
      */
     private int feistel(int input) {
         int left = input / HALF;

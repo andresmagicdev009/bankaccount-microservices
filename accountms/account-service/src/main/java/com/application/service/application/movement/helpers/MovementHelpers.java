@@ -24,15 +24,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Colaborador de MovementService: carga de entidades, validaciones y la unica
- * puerta que toca el saldo.
+ * Collaborator of MovementService: entity loading, validations and the single
+ * door that touches the balance.
  *
- * Aqui vive el COMO -que es invariante-, y en el servicio queda el QUE: create,
- * update y delete solo deciden que delta aplicar.
+ * The HOW -which is invariant- lives here, and the WHAT stays in the service:
+ * create, update and delete only decide which delta to apply.
  *
- * Es @Component y no una clase de estaticos porque necesita los dos puertos
- * inyectados. Colaborador, no clase padre: MovementService no ES un
- * MovementHelpers, solo le delega.
+ * It is a @Component and not a class of statics because it needs both ports
+ * injected. A collaborator, not a parent class: MovementService IS NOT a
+ * MovementHelpers, it only delegates to it.
  */
 @Component
 @RequiredArgsConstructor
@@ -42,24 +42,24 @@ public class MovementHelpers {
     private final MovementRepositoryPort movementRepository;
     private final AccountRepositoryPort accountRepository;
 
-    // ------------------------------------------------------------------ SALDO
+    // ---------------------------------------------------------------- BALANCE
 
     /**
-     * Regla F3. Unica puerta por la que se toca el saldo: valida, lo deja en la
-     * cuenta y la persiste.
+     * Rule F3. The single door through which the balance is touched: it
+     * validates, leaves the value on the account and persists it.
      *
-     * Que el UPDATE de account viva aqui dentro y no en cada caso de uso es lo
-     * que impide que la columna available_balance se desincronice: no hay forma
-     * de mover el saldo sin pasar por este metodo.
+     * Keeping the account UPDATE in here instead of in every use case is what
+     * stops the available_balance column from drifting: there is no way to move
+     * the balance without going through this method.
      *
-     * El detalle -disponible vs. solicitado- va al log y nunca al cuerpo de la
-     * respuesta: el cliente solo debe leer "Saldo no disponible".
+     * The detail -available vs. requested- goes to the log and never to the
+     * response body: the client must only read "Saldo no disponible".
      */
     public BigDecimal applyToBalance(Account account, BigDecimal signedDelta) {
         BigDecimal current = currentBalance(account);
         BigDecimal resulting = current.add(signedDelta);
 
-        // compareTo y no equals: BigDecimal("0.00").equals(ZERO) es false.
+        // compareTo and not equals: BigDecimal("0.00").equals(ZERO) is false.
         if (resulting.compareTo(BigDecimal.ZERO) < 0) {
             log.warn("Insufficient balance on account {}: available {}, requested {}",
                     account.getAccountNumber(), current, signedDelta.abs());
@@ -73,11 +73,11 @@ public class MovementHelpers {
     }
 
     /**
-     * Saldo disponible actual: la columna available_balance de la cuenta.
+     * Current available balance: the available_balance column of the account.
      *
-     * El fallback al saldo de apertura cubre las filas creadas antes de que la
-     * columna existiera, que la traen en null. Una cuenta nueva ya nace con
-     * disponible == inicial, asi que ahi nunca se usa.
+     * The fallback to the opening balance covers the rows created before the
+     * column existed, which carry it as null. A new account is already born
+     * with available == initial, so the fallback never fires there.
      */
     public BigDecimal currentBalance(Account account) {
         return (account.getAvailableBalance() == null)
@@ -85,9 +85,9 @@ public class MovementHelpers {
                 : account.getAvailableBalance();
     }
 
-    // ------------------------------------------------------------- VALIDACION
+    // ------------------------------------------------------------- VALIDATION
 
-    /** "Mayor que cero" es estricto: el cero tambien se rechaza. */
+    /** "Greater than zero" is strict: zero is rejected too. */
     public void requirePositiveValue(BigDecimal value) {
         if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidMovementValueException(value);
@@ -95,9 +95,9 @@ public class MovementHelpers {
     }
 
     /**
-     * Blindaje del saldo historico: solo el ultimo movimiento de la cuenta se
-     * puede editar o borrar. Tocar uno intermedio dejaria mal todos los balance
-     * posteriores.
+     * Shield around the historical balance: only the last movement of the
+     * account can be edited or deleted. Touching one in the middle would leave
+     * every later balance wrong.
      */
     public void requireLastMovement(Movement movement) {
         String lastId = movementRepository.findLatest(movement.getAccountNumber())
@@ -116,11 +116,13 @@ public class MovementHelpers {
     }
 
     /**
-     * Una cuenta inactiva no admite movimientos: ni altas, ni ediciones, ni
-     * reversas. Va despues de loadAccountForMovement y antes de tocar el saldo.
+     * An inactive account accepts no movements: no inserts, no edits, no
+     * reversals. It runs after loadAccountForMovement and before touching the
+     * balance.
      *
-     * status null se trata como inactiva: Boolean desempaquetado con ! reventaria
-     * con NPE, y ante un estado desconocido lo seguro es no mover dinero.
+     * A null status counts as inactive: a Boolean unboxed with ! would blow up
+     * with an NPE, and facing an unknown state the safe move is not to move
+     * money.
      */
     public void requireActiveAccount(Account account) {
         if (!Boolean.TRUE.equals(account.getStatus())) {
@@ -128,19 +130,20 @@ public class MovementHelpers {
         }
     }
 
-    // ------------------------------------------------------------------ CARGA
+    // ----------------------------------------------------------------- LOADING
 
     /**
-     * Carga la cuenta para un movimiento especifico, BLOQUEANDO la fila hasta el
-     * COMMIT (SELECT ... FOR UPDATE).
+     * Loads the account for a specific movement, LOCKING the row until COMMIT
+     * (SELECT ... FOR UPDATE).
      *
-     * Sin el bloqueo, applyToBalance seria un read-modify-write a cielo abierto:
-     * dos debitos simultaneos leerian el mismo saldo, los dos pasarian la regla
-     * F3 y el segundo COMMIT dejaria la cuenta en descubierto. Con el, la
-     * segunda transaccion espera y relee el saldo ya movido.
+     * Without the lock, applyToBalance would be a read-modify-write out in the
+     * open: two simultaneous debits would read the same balance, both would
+     * pass rule F3 and the second COMMIT would leave the account overdrawn.
+     * With it, the second transaction waits and re-reads the balance already
+     * moved.
      *
-     * Todos los llamadores son metodos @Transactional de MovementService; fuera
-     * de una transaccion el bloqueo no duraria nada.
+     * Every caller is a @Transactional method of MovementService; outside a
+     * transaction the lock would not last a moment.
      */
     public Account loadAccountForMovement(String accountNumber) {
         return accountRepository.findByAccountNumberForUpdate(accountNumber)
@@ -153,10 +156,10 @@ public class MovementHelpers {
     }
 
     /**
-     * Cuentas del cliente, para el filtro por usuario del listado.
+     * Accounts of the customer, for the per-customer filter of the listing.
      *
-     * null -> sin filtro. Lista vacia -> el cliente no tiene cuentas, que no es
-     * lo mismo: por eso list corta antes de consultar.
+     * null -> no filter. An empty list -> the customer has no accounts, which is
+     * not the same thing: that is why list stops before querying.
      */
     public List<String> resolveAccountNumbers(String customerId) {
         if (customerId == null) {
@@ -168,15 +171,15 @@ public class MovementHelpers {
                 .toList();
     }
 
-    // ------------------------------------------------------------------ FECHAS
+    // ------------------------------------------------------------------- DATES
 
     public LocalDateTime toFrom(LocalDate startDate) {
         return (startDate == null) ? null : startDate.atStartOfDay();
     }
 
     /**
-     * Con atStartOfDay() aqui perderias todos los movimientos del propio dia
-     * final del rango.
+     * With atStartOfDay() here every movement of the final day of the range
+     * would be lost.
      */
     public LocalDateTime toTo(LocalDate endDate) {
         return (endDate == null) ? null : endDate.atTime(LocalTime.MAX);

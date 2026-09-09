@@ -20,27 +20,28 @@ import com.example.customerms.interfaces.rest.dto.ErrorDto;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Traductor de excepciones de dominio a los codigos del contrato.
+ * Translator from domain exceptions to the codes of the contract.
  *
- * Gracias a esta clase el servicio no sabe de HTTP: lanza excepciones de
- * negocio y aqui se convierten en el ErrorDto generado del YAML
- * (components/schemas/Error), que es el cuerpo que declaran BadRequest,
- * NotFound, Conflict e InternalError.
+ * Thanks to this class the service knows nothing about HTTP: it throws business
+ * exceptions and they are turned here into the ErrorDto generated from the YAML
+ * (components/schemas/Error), which is the body declared by BadRequest,
+ * NotFound, Conflict and InternalError.
  *
- * Hay UN handler para todo el dominio. Spring despacha por polimorfismo, asi
- * que @ExceptionHandler(DomainException.class) atrapa a CustomerNotFound,
- * DuplicateIdentification, InvalidaPageSize y a las que vengan: una excepcion
- * nueva no obliga a tocar este archivo, basta con que elija su ErrorType.
+ * There is ONE handler for the whole domain. Spring dispatches polymorphically,
+ * so @ExceptionHandler(DomainException.class) catches CustomerNotFound,
+ * DuplicateIdentification, InvalidPageSize and whatever comes next: a new
+ * exception does not force a change here, it only has to pick its ErrorType.
  *
- * Al ser @RestControllerAdvice tambien cubre a los controllers reactivos:
- * WebFlux propaga la excepcion por el Mono y la despacha aqui, asi que sirve
- * igual aunque el trabajo bloqueante corra en el scheduler jdbc.
+ * Being a @RestControllerAdvice it also covers the reactive controllers:
+ * WebFlux propagates the exception through the Mono and dispatches it here, so
+ * it works just the same even though the blocking work runs on the jdbc
+ * scheduler.
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalHandlerException {
 
-    /** Unico sitio donde se arma el cuerpo del error. */
+    /** The single place where the error body is assembled. */
     private ResponseEntity<ErrorDto> build(HttpStatus status, String message, ServerWebExchange exchange) {
         ErrorDto body = new ErrorDto()
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
@@ -51,7 +52,7 @@ public class GlobalHandlerException {
         return ResponseEntity.status(status).body(body);
     }
 
-    /** Unico sitio donde el dominio se cruza con HTTP. */
+    /** The single place where the domain meets HTTP. */
     private HttpStatus toStatus(ErrorType type) {
         return switch (type) {
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
@@ -60,11 +61,12 @@ public class GlobalHandlerException {
         };
     }
 
-    // ------------------------------------------------- dominio: 404/400/409
+    // -------------------------------------------------- domain: 404/400/409
     /**
-     * Los 4xx son flujo normal: alguien pidio algo que no existe o mando datos
-     * malos. Se loguean como warn y sin stacktrace, para que un ERROR en el log
-     * siga significando "algo se rompio de nuestro lado".
+     * The 4xx responses are normal flow: somebody asked for something that does
+     * not exist or sent bad data. They are logged as warn and without a stack
+     * trace, so that an ERROR in the log keeps meaning "something broke on our
+     * side".
      */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ErrorDto> handleDomain(DomainException ex, ServerWebExchange exchange) {
@@ -80,9 +82,10 @@ public class GlobalHandlerException {
 
     // ---------------------------------------------------------------- 400
     /**
-     * 400 que no nace del dominio sino del framework: JSON mal formado, un UUID
-     * que no parsea en el path, o @Valid rechazando el body contra el contrato
-     * (WebExchangeBindException hereda de ServerWebInputException).
+     * A 400 that does not come from the domain but from the framework:
+     * malformed JSON, a UUID that does not parse in the path, or @Valid
+     * rejecting the body against the contract (WebExchangeBindException extends
+     * ServerWebInputException).
      */
     @ExceptionHandler(ServerWebInputException.class)
     public ResponseEntity<ErrorDto> handleMalformedRequest(ServerWebInputException ex, ServerWebExchange exchange) {
@@ -99,10 +102,11 @@ public class GlobalHandlerException {
 
     // ---------------------------------------------------------------- 409
     /**
-     * El duplicado visto desde la base: el chequeo previo de CustomerService
-     * pierde ante dos altas simultaneas y salta la unique uq_person_identification.
-     * Se responde 409 igual, pero sin devolver el mensaje de la BD (filtraria
-     * nombres de tablas e indices).
+     * The duplicate as seen from the database: the up-front check in
+     * CustomerService loses against two simultaneous inserts and the
+     * uq_person_identification unique constraint fires. The answer is still a
+     * 409, but without returning the database message (it would leak table and
+     * index names).
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorDto> handleDataIntegrity(DataIntegrityViolationException ex,
@@ -114,19 +118,18 @@ public class GlobalHandlerException {
         return build(HttpStatus.CONFLICT, "Customer already exists with that identification", exchange);
     }
 
-    // ------------------------------------------------- status del framework
+    // --------------------------------------------------- framework statuses
     /**
-     * Excepciones que ya traen su propio codigo HTTP: una ruta inexistente
-     * (NoResourceFoundException -> 404), un metodo no permitido (405), un
-     * Accept que no cuadra (406). Sin este handler caian en la red de
-     * seguridad de abajo y salian como 500, que le miente al cliente.
+     * Exceptions that already carry their own HTTP code: a non-existent route
+     * (NoResourceFoundException -> 404), a method that is not allowed (405), an
+     * Accept header that does not match (406). Without this handler they fell
+     * into the safety net below and went out as 500, which lies to the client.
      *
-     * ServerWebInputException tambien extiende ResponseStatusException, pero
-     * Spring despacha al handler mas especifico, asi que el 400 de arriba
-     * sigue mandando.
+     * ServerWebInputException also extends ResponseStatusException, but Spring
+     * dispatches to the most specific handler, so the 400 above still wins.
      *
-     * Se responde con el reason phrase del status y no con ex.getReason(): ese
-     * texto incluye la ruta pedida y detalles internos del framework.
+     * The answer carries the status reason phrase and not ex.getReason(): that
+     * text includes the requested path and internal framework details.
      */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorDto> handleResponseStatus(ResponseStatusException ex, ServerWebExchange exchange) {
@@ -144,9 +147,9 @@ public class GlobalHandlerException {
 
     // ---------------------------------------------------------------- 500
     /**
-     * Red de seguridad. Loguea el stacktrace completo, pero NUNCA devuelve
-     * ex.getMessage() al cliente: ese texto puede filtrar nombres de tablas,
-     * rutas de archivos o SQL.
+     * Safety net. It logs the full stack trace, but NEVER returns
+     * ex.getMessage() to the client: that text can leak table names, file paths
+     * or SQL.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDto> handleUnexpected(Exception ex, ServerWebExchange exchange) {

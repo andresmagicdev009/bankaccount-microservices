@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import com.application.service.domain.movement.entity.Movement;
 import com.application.service.infrastructure.persistence.jpa.entity.MovementEntity;
 
-/** PASO 2.6 - Traductor Movement (dominio) <-> MovementEntity (JPA). */
+/** Translator Movement (domain) <-> MovementEntity (JPA). */
 @Component
 public class MovementPersistenceMapper {
 
@@ -17,8 +17,8 @@ public class MovementPersistenceMapper {
     }
 
     /**
-     * El accountNumber no se copia: un movimiento no cambia de cuenta. Moverlo
-     * descuadraria el saldo de las dos cuentas, asi que se fija en el insert.
+     * The accountNumber is not copied: a movement does not change account.
+     * Moving it would unbalance both accounts, so it is fixed at insert time.
      */
     public void updateEntity(MovementEntity entity, Movement movement) {
         copyState(entity, movement);

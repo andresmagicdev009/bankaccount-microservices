@@ -19,10 +19,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * PASO 2.1 - Tabla account. Esta clase es la unica que sabe de JPA.
+ * Table account. This class is the only one that knows about JPA.
  *
- * No confundir con domain/account/entity/Account: aquella tiene las reglas,
- * esta tiene las columnas.
+ * Not to be confused with domain/account/entity/Account: that one holds the
+ * rules, this one holds the columns.
  */
 @Entity
 @Table(name = "account")
@@ -32,27 +32,28 @@ import lombok.Setter;
 public class AccountEntity {
 
     /**
-     * Clave primaria natural: el numero de cuenta lo asigna AccountService, por
-     * eso no lleva @GeneratedValue.
+     * Natural primary key: the account number is assigned by AccountService,
+     * which is why there is no @GeneratedValue.
      */
     @Id
     @Column(name = "account_number", length = 20, nullable = false, updatable = false)
     private String accountNumber;
 
-    /** STRING y nunca ORDINAL: con ORDINAL, reordenar el enum corrompe los datos. */
+    /** STRING and never ORDINAL: with ORDINAL, reordering the enum corrupts the data. */
     @Enumerated(EnumType.STRING)
     @Column(name = "account_type", nullable = false, length = 20)
     private AccountType accountType;
 
-    /** Saldo de apertura: se fija al crear la cuenta y no se muta nunca. */
+    /** Opening balance: set when the account is created and never mutated. */
     @Column(name = "initial_balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal initialBalance;
 
     /**
-     * Saldo disponible. Al crear la cuenta arranca igual al saldo de apertura.
+     * Available balance. When the account is created it starts equal to the
+     * opening balance.
      *
-     * Misma precision que initial_balance a proposito: son la misma magnitud y
-     * una escala distinta redondearia al copiar uno sobre otro.
+     * Same precision as initial_balance on purpose: they are the same magnitude
+     * and a different scale would round while copying one onto the other.
      */
     @Column(name = "available_balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal availableBalance;
@@ -61,8 +62,9 @@ public class AccountEntity {
     private Boolean status;
 
     /**
-     * NO es @ManyToOne ni FK: el cliente vive en la base del otro microservicio.
-     * La integridad se valida por REST contra CustomerLookupPort.
+     * NOT a @ManyToOne and not a FK: the customer lives in the database of the
+     * other microservice. Integrity is validated over REST through
+     * CustomerLookupPort.
      */
     @Column(name = "customer_id", nullable = false, length = 36)
     private String customerId;

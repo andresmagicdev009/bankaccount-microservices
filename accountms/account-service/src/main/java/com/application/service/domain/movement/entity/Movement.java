@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * PASO 1.4 - Modelo de dominio del movimiento.
+ * Domain model of the movement.
  *
- * balance guarda el saldo de la cuenta DESPUES de aplicar este movimiento: es
- * un dato historico congelado que pide el contrato y usa el reporte.
+ * balance holds the balance of the account AFTER applying this movement: a
+ * frozen historical value required by the contract and used by the report.
  */
 @Getter
 @Setter
@@ -29,7 +29,7 @@ public class Movement {
     private BigDecimal balance;
     private String accountNumber;
 
-    /** Convierte tipo + monto en un numero con signo, listo para sumar al saldo. */
+    /** Turns type + amount into a signed number, ready to add to the balance. */
     public BigDecimal signedValue() {
         return movementType.signed(value);
     }

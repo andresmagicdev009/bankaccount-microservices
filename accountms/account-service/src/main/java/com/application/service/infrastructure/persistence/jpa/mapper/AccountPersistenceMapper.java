@@ -6,19 +6,19 @@ import com.application.service.domain.account.entity.Account;
 import com.application.service.infrastructure.persistence.jpa.entity.AccountEntity;
 
 /**
- * PASO 2.5 - Traductor Account (dominio) <-> AccountEntity (JPA).
+ * Translator Account (domain) <-> AccountEntity (JPA).
  *
- * A mano, como en customerms: una dependencia menos que MapStruct y la lista de
- * campos vive en un solo metodo (copyState).
+ * Written by hand, like in customerms: one dependency less than MapStruct and
+ * the list of fields lives in a single method (copyState).
  */
 @Component
 public class AccountPersistenceMapper {
 
     /**
-     * Para insertar: la entidad todavia no existe en la base.
+     * For inserting: the entity does not exist in the database yet.
      *
-     * Es el unico punto del mapper que escribe availableBalance: una cuenta nace
-     * con su saldo de apertura. De ahi en adelante la columna solo la mueve
+     * It is the only point of the mapper writing availableBalance: an account is
+     * born with its opening balance. From then on the column is only moved by
      * AccountRepositoryPort.updateAvailableBalance.
      */
     public AccountEntity toEntity(Account account) {
@@ -30,14 +30,14 @@ public class AccountPersistenceMapper {
     }
 
     /**
-     * Copia solo el estado mutable sobre una entidad YA administrada por JPA.
-     * No toca el id ni createdAt/updatedAt: de esos se encarga Hibernate, y
-     * pisarlos borraria la fecha de alta original.
+     * Copies only the mutable state onto an entity ALREADY managed by JPA. It
+     * touches neither the id nor createdAt/updatedAt: Hibernate takes care of
+     * those, and overwriting them would erase the original creation date.
      *
-     * Tampoco toca availableBalance, y eso es deliberado: el CRUD de cuentas
-     * trabaja sobre una lectura sin bloqueo, asi que copiar el saldo aqui haria
-     * que un PUT /accounts concurrente con un movimiento reescribiera el saldo
-     * viejo encima del recien calculado.
+     * It does not touch availableBalance either, and that is deliberate: the
+     * account CRUD works on a read without a lock, so copying the balance here
+     * would let a PUT /accounts concurrent with a movement write the old
+     * balance over the freshly computed one.
      */
     public void updateEntity(AccountEntity entity, Account account) {
         copyState(entity, account);
@@ -59,7 +59,7 @@ public class AccountPersistenceMapper {
                 .build();
     }
 
-    /** Unico sitio con la lista de campos: lo comparten toEntity y updateEntity. */
+    /** The single place holding the field list: shared by toEntity and updateEntity. */
     private void copyState(AccountEntity entity, Account account) {
         entity.setAccountType(account.getAccountType());
         entity.setInitialBalance(account.getInitialBalance());

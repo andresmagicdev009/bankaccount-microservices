@@ -3,7 +3,7 @@ package com.example.customerms.application.customer.service;
 import com.example.customerms.domain.customer.entity.Customer;
 import com.example.customerms.domain.customer.exception.CustomerNotFoundException;
 import com.example.customerms.domain.customer.exception.DuplicateIdentificationException;
-import com.example.customerms.domain.customer.exception.InvalidaPageSizeException;
+import com.example.customerms.domain.customer.exception.InvalidPageSizeException;
 import com.example.customerms.domain.customer.repository.CustomerRepositoryPort;
 import com.example.customerms.interfaces.rest.dto.CustomerPatchDto;
 
@@ -55,13 +55,13 @@ public class CustomerService {
                 .orElseThrow(() -> new CustomerNotFoundException(id));
     }
 
-    // This methos works to find all customers
+    // This method works to find all customers
     public Page<Customer> findAll(Integer page, Integer size, Boolean status) {
         int pageNumber = (page == null || page < 0) ? 0: page;
 
-        // Utilizar excepciones para validar el tamaño de la página
+        // Use an exception to validate the page size.
         if (size != null && (size < 1 || size > 100)) {
-            throw new InvalidaPageSizeException(size, "Invalid page size.");
+            throw new InvalidPageSizeException(size, "Invalid page size.");
         }
         int pageSize = (size == null) ? 20: size;
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
@@ -91,9 +91,9 @@ public class CustomerService {
         existing.setPhone(customer.getPhone());
         existing.setAddress(customer.getAddress());
         existing.setStatus(customer.getStatus());
-        // El PUT es un reemplazo completo y el contrato declara password como
-        // required (@NotNull en CustomerUpdateDto), asi que siempre viene: se
-        // aplica igual que el resto de campos.
+        // PUT is a full replacement and the contract declares password as
+        // required (@NotNull on CustomerUpdateDto), so it always arrives: it is
+        // applied like every other field.
         existing.setPassword(customer.getPassword());
 
         // Save the updated customer
@@ -105,10 +105,10 @@ public class CustomerService {
 
     @Transactional
     public Customer patch(String id, CustomerPatchDto patchDto) {
-        // 1. Buscar cliente existente
+        // 1. Look up the existing customer
         Customer existing = findById(id);
 
-        // 2. Actualizar solo los campos que NO sean nulos en la petición
+        // 2. Update only the fields that are NOT null in the request
         if (patchDto.getName() != null) {
             existing.setName(patchDto.getName());
         }
@@ -121,13 +121,13 @@ public class CustomerService {
         if (patchDto.getStatus() != null) {
             existing.setStatus(patchDto.getStatus());
         }
-        // password tambien es parcheable segun el contrato. Va con guarda de null
-        // como el resto: en PATCH, campo ausente significa "dejalo como esta".
+        // password is patchable too, per the contract. It gets a null guard like
+        // the rest: in a PATCH, an absent field means "leave it as it is".
         if (patchDto.getPassword() != null) {
             existing.setPassword(patchDto.getPassword());
         }
 
-        // 3. Guardar cliente actualizado
+        // 3. Save the updated customer
         return repository.save(existing);
     }
 

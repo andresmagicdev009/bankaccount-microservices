@@ -4,12 +4,12 @@ import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.BusinessRuleException;
 
 /**
- * PASO 1.12 - Regla de negocio F3: saldo insuficiente -> 422.
+ * Business rule F3: insufficient balance -> 422.
  *
- * El mensaje que llega al cliente es EXACTAMENTE "Saldo no disponible": lo
- * define ErrorCode.INSUFFICIENT_BALANCE y no lleva argumentos. Si necesitas el
- * detalle (saldo disponible vs. solicitado) para depurar, va en el log del
- * MovementService, nunca en el cuerpo de la respuesta.
+ * The message reaching the client is EXACTLY "Saldo no disponible": it is
+ * defined by ErrorCode.INSUFFICIENT_BALANCE and takes no arguments. The detail
+ * needed for debugging (available vs. requested balance) goes into the
+ * MovementService log, never into the response body.
  */
 public class InsufficientBalanceException extends BusinessRuleException {
 

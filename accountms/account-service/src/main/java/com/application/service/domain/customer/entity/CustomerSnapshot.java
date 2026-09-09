@@ -6,13 +6,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * PASO 1.5 - Vista de solo lectura del cliente que vive en el microservicio de clientes.
+ * Read-only view of the customer that lives in the customer microservice.
  *
- * Este servicio NUNCA persiste esto: lo pide por REST para (a) validar que el
- * cliente existe al crear una cuenta y (b) llenar la cabecera del reporte.
- *
- * TODO: campos customerId (String), name (String), identification (String)
- *       + Lombok (@Getter @Builder @NoArgsConstructor @AllArgsConstructor).
+ * This service NEVER persists it: it asks for it over REST to (a) validate that
+ * the customer exists when an account is created and (b) fill in the report
+ * header.
  */
 @Getter
 @Builder

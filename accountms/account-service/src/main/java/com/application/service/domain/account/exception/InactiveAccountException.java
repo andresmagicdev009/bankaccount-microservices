@@ -4,12 +4,12 @@ import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.StateConflictException;
 
 /**
- * La cuenta existe pero su estado no admite movimientos -> 409.
+ * The account exists but its state does not accept movements -> 409.
  *
- * Misma categoria que AccountBalanceNotZeroException y por la misma razon: el
- * recurso esta ahi, es su estado el que bloquea la operacion. No es un 404,
- * que le mentiria al cliente diciendole que la cuenta no existe, ni un 422,
- * que reservamos para reglas sobre los datos de la peticion (regla F3).
+ * Same category as AccountBalanceNotZeroException and for the same reason: the
+ * resource is there, it is its state that blocks the operation. It is not a
+ * 404, which would lie to the client by saying the account does not exist, nor
+ * a 422, which is reserved for rules about the request data (rule F3).
  */
 public class InactiveAccountException extends StateConflictException {
 

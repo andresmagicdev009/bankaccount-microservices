@@ -12,18 +12,14 @@ import lombok.Builder;
 import lombok.Getter;
 
 /**
- * PASO 5.4 - Resultado del caso de uso del reporte.
+ * Result of the report use case.
  *
- * Por que no devolver directo el DTO del contrato: si ReportService devolviera
- * AccountStatementReportDto, la capa application quedaria atada a HTTP. Con este
- * modelo intermedio el mismo resultado puede pintarse como JSON hoy y como Excel
- * manana sin tocar el servicio.
+ * Why not return the DTO of the contract directly: if ReportService returned
+ * AccountStatementReportDto, the application layer would be tied to HTTP. With
+ * this intermediate model the same result can be rendered as JSON today and as
+ * Excel tomorrow without touching the service.
  *
- * TODO: campos (todos final + @Getter @Builder)
- *       CustomerSnapshot customer
- *       LocalDate startDate / endDate
- *       List<Account> accounts
- *       Map<String, List<Movement>> movementsByAccount  -> clave: numero de cuenta
+ * movementsByAccount is keyed by account number.
  */
 
 @Getter

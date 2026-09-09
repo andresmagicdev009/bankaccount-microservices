@@ -3,7 +3,7 @@ package com.example.customerms.application.customer.service;
 import com.example.customerms.domain.customer.entity.Customer;
 import com.example.customerms.domain.customer.exception.CustomerNotFoundException;
 import com.example.customerms.domain.customer.exception.DuplicateIdentificationException;
-import com.example.customerms.domain.customer.exception.InvalidaPageSizeException;
+import com.example.customerms.domain.customer.exception.InvalidPageSizeException;
 import com.example.customerms.domain.customer.repository.CustomerRepositoryPort;
 import com.example.customerms.domain.person.entity.Gender;
 import com.example.customerms.domain.shared.exception.ErrorType;
@@ -34,20 +34,21 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Pruebas unitarias de CustomerService. Sin Spring, sin base de datos, sin
- * Docker: solo la clase bajo prueba y un doble del puerto de persistencia.
+ * Unit tests for CustomerService. No Spring, no database, no Docker: only the
+ * class under test and a double of the persistence port.
  *
- * Aqui se prueban las decisiones que toma el servicio -el default de status, el
- * rechazo del duplicado, los limites de paginacion, que campos sobreescribe el
- * update- que en el test de integracion quedan mezcladas con HTTP y SQL. Cuando
- * uno de estos falla, el fallo apunta a una linea de negocio, no a una capa.
+ * What is tested here are the decisions the service makes -the status default,
+ * the rejection of a duplicate, the pagination limits, which fields the update
+ * overwrites- which in the integration test come mixed with HTTP and SQL. When
+ * one of these fails, the failure points at a line of business logic, not at a
+ * layer.
  *
- * Complementa a CustomerIntegrationTest, no lo reemplaza: un mock siempre
- * responde lo que le dijeron, asi que nada de esto prueba que el SQL funcione.
+ * It complements CustomerIT, it does not replace it: a mock always answers what
+ * it was told to, so none of this proves the SQL works.
  *
- * MockitoExtension corre en modo STRICT_STUBS: un stub que ningun test usa
- * hace fallar la prueba. Es a proposito, evita que queden stubs muertos
- * mintiendo sobre lo que el test cubre.
+ * MockitoExtension runs in STRICT_STUBS mode: a stub no test uses fails the
+ * suite. That is on purpose, it keeps dead stubs from lying about what the test
+ * covers.
  */
 @ExtendWith(MockitoExtension.class)
 class CustomerServiceTest {
@@ -72,7 +73,7 @@ class CustomerServiceTest {
     // ------------------------------------------------------------ create
 
     @Test
-    @DisplayName("create guarda el cliente y devuelve lo que responde el repositorio")
+    @DisplayName("create saves the customer and returns what the repository answers")
     void create_savesAndReturnsPersistedCustomer() {
         Customer input = newCustomer();
         Customer persisted = Customer.builder()
@@ -90,33 +91,33 @@ class CustomerServiceTest {
 
         Customer result = service.create(input);
 
-        // El servicio devuelve lo que sale del repositorio, no lo que entro: es
-        // ahi donde aparecen el id y los timestamps.
+        // The service returns what comes out of the repository, not what went in:
+        // that is where the id and the timestamps appear.
         assertThat(result).isSameAs(persisted);
         assertThat(result.getId()).isNotNull();
         verify(repository).save(input);
     }
 
     @Test
-    @DisplayName("create pone status en true cuando el cliente llega sin status")
+    @DisplayName("create sets status to true when the customer arrives without one")
     void create_defaultsStatusToTrue_whenNull() {
         Customer input = newCustomer();
-        assertThat(input.getStatus()).isNull();   // el contrato lo declara opcional
+        assertThat(input.getStatus()).isNull();   // the contract declares it optional
 
         when(repository.existsByIdentification(input.getIdentification())).thenReturn(false);
         when(repository.save(any(Customer.class))).thenAnswer(call -> call.getArgument(0));
 
         service.create(input);
 
-        // Se captura lo que llego al repositorio: el default debe aplicarse ANTES
-        // de guardar, no al mapear la respuesta.
+        // What reached the repository is captured: the default must be applied
+        // BEFORE saving, not while mapping the response.
         ArgumentCaptor<Customer> saved = ArgumentCaptor.forClass(Customer.class);
         verify(repository).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isTrue();
     }
 
     @Test
-    @DisplayName("create respeta status=false si viene explicito en la peticion")
+    @DisplayName("create honours status=false when it comes explicitly in the request")
     void create_keepsExplicitStatus() {
         Customer input = newCustomer();
         input.setStatus(false);
@@ -132,7 +133,7 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("create rechaza identification duplicada y no llega a guardar")
+    @DisplayName("create rejects a duplicate identification and never saves")
     void create_throwsDuplicate_andDoesNotSave() {
         Customer input = newCustomer();
         when(repository.existsByIdentification(input.getIdentification())).thenReturn(true);
@@ -140,16 +141,16 @@ class CustomerServiceTest {
         assertThatThrownBy(() -> service.create(input))
                 .isInstanceOf(DuplicateIdentificationException.class)
                 .hasMessageContaining(input.getIdentification())
-                .extracting("type").isEqualTo(ErrorType.CONFLICT);   // el advice lo traduce a 409
+                .extracting("type").isEqualTo(ErrorType.CONFLICT);   // the advice turns it into a 409
 
-        // Lo importante del caso: el rechazo corta antes del INSERT.
+        // The point of this case: the rejection stops before the INSERT.
         verify(repository, never()).save(any());
     }
 
     // ------------------------------------------------------------ update
 
     @Test
-    @DisplayName("update sobreescribe los campos editables sobre el cliente existente")
+    @DisplayName("update overwrites the editable fields on the existing customer")
     void update_overwritesEditableFields() {
         String id = "11111111-1111-1111-1111-111111111111";
         LocalDateTime createdAt = LocalDateTime.now().minusDays(3);
@@ -188,18 +189,18 @@ class CustomerServiceTest {
         assertThat(result.getPhone()).isEqualTo("097777777");
         assertThat(result.getStatus()).isFalse();
 
-        // El update muta la instancia existente, no crea una nueva: id y createdAt
-        // sobreviven porque nunca se tocan.
+        // The update mutates the existing instance, it does not create a new one:
+        // id and createdAt survive because they are never touched.
         assertThat(result.getId()).isEqualTo(id);
         assertThat(result.getCreatedAt()).isEqualTo(createdAt);
 
-        // El password tambien se reemplaza: el PUT es sustitucion completa y el
-        // contrato lo declara required (@NotNull en CustomerUpdateDto).
+        // The password is replaced too: PUT is a full substitution and the
+        // contract declares it required (@NotNull on CustomerUpdateDto).
         assertThat(result.getPassword()).isEqualTo("nuevo-password");
     }
 
     @Test
-    @DisplayName("update sobre un id inexistente lanza 404 y no guarda nada")
+    @DisplayName("update on an unknown id throws 404 and saves nothing")
     void update_throwsNotFound_andDoesNotSave() {
         String unknownId = "99999999-9999-9999-9999-999999999999";
         when(repository.findById(unknownId)).thenReturn(Optional.empty());
@@ -215,7 +216,7 @@ class CustomerServiceTest {
     // ----------------------------------------------------------- findAll
 
     @Test
-    @DisplayName("findAll aplica pagina 0 y tamano 20 cuando no se envian parametros")
+    @DisplayName("findAll applies page 0 and size 20 when no parameters are sent")
     void findAll_appliesDefaults_whenParamsAreNull() {
         Customer customer = newCustomer();
         when(repository.findAll(eq(null), any(Pageable.class)))
@@ -225,15 +226,15 @@ class CustomerServiceTest {
 
         assertThat(result.getContent()).containsExactly(customer);
 
-        // Los defaults son decision del servicio, no del repositorio: se comprueba
-        // el Pageable que efectivamente se le pasa.
+        // The defaults are the service's decision, not the repository's: the
+        // Pageable actually handed to it is what gets checked.
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).findAll(eq(null), pageable.capture());
         assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 20));
     }
 
     @Test
-    @DisplayName("findAll normaliza una pagina negativa a 0 y propaga el filtro status")
+    @DisplayName("findAll normalises a negative page to 0 and propagates the status filter")
     void findAll_normalizesNegativePage_andPassesStatusFilter() {
         when(repository.findAll(eq(true), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
@@ -246,17 +247,17 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("findAll rechaza tamanos fuera del rango 1..100 sin consultar la BD")
+    @DisplayName("findAll rejects sizes outside the 1..100 range without querying the DB")
     void findAll_throwsInvalidPageSize_whenSizeOutOfRange() {
         assertThatThrownBy(() -> service.findAll(0, 0, null))
-                .isInstanceOf(InvalidaPageSizeException.class)
-                .extracting("type").isEqualTo(ErrorType.INVALID_INPUT);   // el advice lo traduce a 400
+                .isInstanceOf(InvalidPageSizeException.class)
+                .extracting("type").isEqualTo(ErrorType.INVALID_INPUT);   // the advice turns it into a 400
 
         assertThatThrownBy(() -> service.findAll(0, 101, null))
-                .isInstanceOf(InvalidaPageSizeException.class);
+                .isInstanceOf(InvalidPageSizeException.class);
 
-        // La validacion corta antes de tocar el repositorio: una consulta con
-        // size=101 nunca deberia salir hacia la base.
+        // Validation stops before touching the repository: a query with size=101
+        // should never reach the database.
         verifyNoMoreInteractions(repository);
     }
 }

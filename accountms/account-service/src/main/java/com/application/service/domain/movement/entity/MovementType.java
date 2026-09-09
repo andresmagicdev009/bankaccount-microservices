@@ -3,18 +3,14 @@ package com.application.service.domain.movement.entity;
 import java.math.BigDecimal;
 
 /**
- * PASO 1.3 - Tipos de movimiento.
+ * Movement types.
  *
- * TODO 1: declara DEBIT y CREDIT (mismos nombres que el contrato).
- *
- * TODO 2: agrega el metodo signed(BigDecimal value).
- *         Es la regla F2 del enunciado convertida en codigo:
- *           DEBIT  -> devuelve value.negate()  (resta del saldo)
- *           CREDIT -> devuelve value           (suma al saldo)
- *         Ponerlo aqui evita repetir if/else en el servicio.
+ * signed(BigDecimal) is rule F2 of the specification turned into code:
+ *   DEBIT  -> returns value.negate()  (subtracts from the balance)
+ *   CREDIT -> returns value           (adds to the balance)
+ * Keeping it here avoids repeating an if/else in the service.
  */
 public enum MovementType {
-    // TODO: DEBIT, CREDIT
     DEBIT, CREDIT;
 
     public BigDecimal signed(BigDecimal value){

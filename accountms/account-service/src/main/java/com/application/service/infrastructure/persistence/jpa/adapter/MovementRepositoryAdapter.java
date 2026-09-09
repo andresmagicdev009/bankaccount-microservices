@@ -18,7 +18,7 @@ import com.application.service.infrastructure.persistence.jpa.specification.Move
 
 import lombok.RequiredArgsConstructor;
 
-/** PASO 2.8 - Implementacion de MovementRepositoryPort. */
+/** Implementation of MovementRepositoryPort. */
 @Component
 @RequiredArgsConstructor
 public class MovementRepositoryAdapter implements MovementRepositoryPort {
@@ -55,7 +55,7 @@ public class MovementRepositoryAdapter implements MovementRepositoryPort {
                 .map(mapper::toDomain);
     }
 
-    /** Orden ascendente por fecha: es como el reporte encadena los saldos. */
+    /** Ascending order by date: it is how the report chains the balances. */
     @Override
     public List<Movement> findByAccountAndRange(String accountNumber,
             LocalDateTime from, LocalDateTime to) {

@@ -17,21 +17,22 @@ import com.application.service.interfaces.rest.dto.AccountStatementReportRangeDt
 import com.application.service.interfaces.rest.dto.MovementDetailDto;
 
 /**
- * PASO 6.3 - Pinta el AccountStatement como el modelo de reporte del contrato.
+ * Renders the AccountStatement as the report model of the contract.
  *
- * ReportService responde QUE datos lleva el estado de cuenta; esta clase decide
- * COMO se ven. Esa separacion es la que permitira agregar el formato Excel
- * (?format=excel) escribiendo otro pintor sobre el mismo AccountStatement, sin
- * tocar el caso de uso.
+ * ReportService answers WHICH data the statement carries; this class decides
+ * HOW it looks. That separation is what will allow adding the Excel format
+ * (?format=excel) by writing another renderer over the same AccountStatement,
+ * without touching the use case.
  *
- * Aqui se materializa la union que el dominio mantiene separada: Account no
- * contiene sus movimientos -son dos agregados distintos-, asi que el reporte
- * los trae en un mapa aparte y este mapper los cose por numero de cuenta.
+ * Here the join the domain keeps apart is materialised: Account does not
+ * contain its movements -they are two different aggregates-, so the report
+ * brings them in a separate map and this mapper stitches them by account
+ * number.
  */
 @Component
 public class ReportMapper {
 
-    /** Punto de entrada: estado de cuenta completo -> body del 200. */
+    /** Entry point: the whole statement -> body of the 200. */
     public AccountStatementReportDto toDto(AccountStatement statement) {
         List<AccountReportDto> accounts = statement.getAccounts().stream()
                 .map(account -> toAccountDto(account, statement))
@@ -43,7 +44,7 @@ public class ReportMapper {
                 .accounts(accounts);
     }
 
-    // ------------------------------------------------------------- cabecera
+    // --------------------------------------------------------------- header
 
     private AccountStatementReportCustomerDto toCustomerDto(CustomerSnapshot customer) {
         return new AccountStatementReportCustomerDto()
@@ -58,12 +59,13 @@ public class ReportMapper {
                 .endDate(statement.getEndDate());
     }
 
-    // --------------------------------------------------------------- cuenta
+    // -------------------------------------------------------------- account
 
     /**
-     * La costura: los movimientos de esta cuenta salen del mapa del statement,
-     * no del Account. getOrDefault y no get porque una cuenta sin movimientos
-     * en el rango es normal -sale con la lista vacia, no ausente del reporte.
+     * The stitch: the movements of this account come from the statement map,
+     * not from the Account. getOrDefault and not get because an account with no
+     * movements in the range is normal -it comes out with an empty list, not
+     * missing from the report.
      */
     private AccountReportDto toAccountDto(Account account, AccountStatement statement) {
         List<Movement> movements = statement.getMovementsByAccount()
@@ -79,10 +81,10 @@ public class ReportMapper {
     }
 
     /**
-     * El detalle del reporte no lleva movementId ni accountNumber: el primero no
-     * aporta al estado de cuenta y el segundo ya esta en la cuenta que lo
-     * contiene. Por eso es un DTO distinto de MovementDto y no se reutiliza
-     * MovementMapper.
+     * The report detail carries neither movementId nor accountNumber: the first
+     * adds nothing to a statement and the second is already on the account
+     * holding it. That is why this is a DTO different from MovementDto and
+     * MovementMapper is not reused.
      */
     private MovementDetailDto toMovementDto(Movement movement) {
         return new MovementDetailDto()

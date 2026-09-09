@@ -181,6 +181,22 @@
 					</execution>
 				</executions>
 			</plugin>
+			<!-- The *IT classes are integration tests: they start a container
+			     and an HTTP server. Surefire (mvn test) only picks up
+			     *Test/*Tests, so these run under failsafe in mvn verify.
+			     Keeping them apart leaves the fast unit cycle untouched. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 

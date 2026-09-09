@@ -19,13 +19,13 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * PASO 7.3 - Controller del reporte.
+ * Report controller.
  *
- * Es el unico endpoint que no es CRUD: combina datos propios (cuentas y
- * movimientos) con datos del microservicio de clientes.
+ * It is the only endpoint that is not CRUD: it combines our own data (accounts
+ * and movements) with data from the customer microservice.
  *
- * Como en los otros dos controllers, la ruta -GET /reports/{client-id}- y sus
- * parametros vienen de ReportsApi, generada del contrato.
+ * As in the other two controllers, the route -GET /reports/{client-id}- and its
+ * parameters come from ReportsApi, generated from the contract.
  */
 @RestController
 @RequiredArgsConstructor
@@ -37,27 +37,28 @@ public class ReportController implements ReportsApi {
     private final BlockingBridge blocking;
 
     /**
-     * GET /reports/{client-id}?startDate=...&endDate=... -> 200 con el estado
-     * de cuenta en JSON.
+     * GET /reports/{client-id}?startDate=...&endDate=... -> 200 with the
+     * account statement in JSON.
      *
-     * El trabajo pesado sale del event loop igual que en el resto: aqui son
-     * 1 + N consultas bloqueantes (las cuentas, y los movimientos de cada una)
-     * mas una llamada REST al microservicio de clientes.
+     * The heavy work leaves the event loop like everywhere else: here it is
+     * 1 + N blocking queries (the accounts, and the movements of each one) plus
+     * a REST call to the customer microservice.
      *
-     * El contrato declara clientId como UUID y el dominio lo guarda como
-     * String: la conversion se hace en el borde, no en el servicio.
+     * The contract declares clientId as a UUID and the domain stores it as a
+     * String: the conversion happens at the edge, not in the service.
      *
-     * Los errores no se capturan: InvalidDateRangeException -> 400,
-     * CustomerNotFoundException -> 404 (cliente inexistente o sin cuentas) y
-     * CustomerServiceUnavailableException -> 502, todos via
+     * The errors are not caught: InvalidDateRangeException -> 400,
+     * CustomerNotFoundException -> 404 (unknown customer, or one with no
+     * accounts) and CustomerServiceUnavailableException -> 502, all through
      * GlobalExceptionHandler.
      *
-     * format se ignora por ahora: el contrato ya lo declara para el Excel, pero
-     * mientras solo exista el pintor JSON cualquier valor devuelve JSON. El dia
-     * del Excel se ramifica aqui, sobre el mismo AccountStatement.
+     * format is ignored for now: the contract already declares it for the Excel
+     * output, but while only the JSON renderer exists any value returns JSON.
+     * The day the Excel arrives, the branch goes here, over the same
+     * AccountStatement.
      */
     @Override
-    public Mono<ResponseEntity<AccountStatementReportDto>> generateAccountStatementReport(UUID clientId,
+    public Mono<ResponseEntity<AccountStatementReportDto>> getAccountStatementReport(UUID clientId,
             LocalDate startDate, LocalDate endDate, String format, ServerWebExchange exchange) {
 
         String customerId = clientId.toString();

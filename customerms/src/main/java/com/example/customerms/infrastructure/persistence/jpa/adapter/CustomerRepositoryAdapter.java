@@ -11,11 +11,18 @@ import com.example.customerms.infrastructure.persistence.jpa.mapper.CustomerPers
 import com.example.customerms.infrastructure.persistence.jpa.repository.JpaCustomerRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+/**
+ * JPA adapter for {@link CustomerRepositoryPort}. Logs at DEBUG level: the
+ * business events are already logged by CustomerService, so what is useful
+ * here is the row-level detail when a request has to be traced end to end.
+ */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CustomerRepositoryAdapter implements CustomerRepositoryPort {
@@ -33,17 +40,22 @@ public class CustomerRepositoryAdapter implements CustomerRepositoryPort {
                     .orElseThrow(() -> new CustomerNotFoundException(customer.getId()));
             mapper.updateEntity(entity, customer);
         }
-        // saveAndFlush y no save: con GenerationType.UUID el id se asigna en memoria,
-        // asi que save() no toca la base y Hibernate difiere el INSERT hasta el commit.
-        // @CreationTimestamp / @UpdateTimestamp se resuelven en ese INSERT, asi que sin
-        // flush el mapeo de vuelta leeria createdAt/updatedAt todavia en null y la
-        // respuesta rompería el contrato, que los declara required.
-        return mapper.toDomain(jpaRepository.saveAndFlush(entity));
+        // saveAndFlush rather than save: with GenerationType.UUID the id is assigned
+        // in memory, so save() never touches the database and Hibernate defers the
+        // INSERT until commit. @CreationTimestamp / @UpdateTimestamp are resolved in
+        // that INSERT, so without the flush the mapping back would read createdAt and
+        // updatedAt still null and the response would break the contract, which
+        // declares them required.
+        CustomerEntity persisted = jpaRepository.saveAndFlush(entity);
+        log.debug("Customer row persisted: id={}", persisted.getId());
+        return mapper.toDomain(persisted);
     }
 
     @Override
     public Optional<Customer> findById(String id) {
-        return jpaRepository.findById(id).map(mapper::toDomain);
+        Optional<Customer> found = jpaRepository.findById(id).map(mapper::toDomain);
+        log.debug("findById id={} hit={}", id, found.isPresent());
+        return found;
     }
 
     @Override
@@ -69,13 +81,16 @@ public class CustomerRepositoryAdapter implements CustomerRepositoryPort {
             throw new CustomerNotFoundException(id);
         }
         jpaRepository.deleteById(id);
+        log.debug("Customer row deleted: id={}", id);
     }
 
     @Override 
     public Page<Customer> findAll(Boolean status, Pageable pageable) {
-        Page<CustomerEntity> page = (status == null) 
-                ? jpaRepository.findAll(pageable) 
-                : jpaRepository.findByStatus(status, pageable); 
+        Page<CustomerEntity> page = (status == null)
+                ? jpaRepository.findAll(pageable)
+                : jpaRepository.findByStatus(status, pageable);
+        log.debug("findAll status={} page={} size={} totalElements={}",
+                status, pageable.getPageNumber(), pageable.getPageSize(), page.getTotalElements());
         return page.map(mapper::toDomain);
     }
 

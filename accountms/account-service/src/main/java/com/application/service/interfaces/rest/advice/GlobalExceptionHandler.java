@@ -22,23 +22,23 @@ import com.application.service.interfaces.rest.dto.ErrorDto;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * PASO 8 - Traductor de excepciones de dominio a los codigos del contrato.
+ * Translator from domain exceptions to the codes of the contract.
  *
- * Esta clase es la que permite que los servicios no sepan de HTTP: ellos lanzan
- * excepciones de negocio y aqui se convierten en el ErrorDto generado del YAML
- * (components/schemas/Error).
+ * This class is what lets the services stay ignorant of HTTP: they throw
+ * business exceptions and here they are turned into the ErrorDto generated from
+ * the YAML (components/schemas/Error).
  *
- * Hay un handler por CATEGORIA, no por excepcion concreta. Spring despacha por
- * polimorfismo: @ExceptionHandler(ResourceNotFoundException.class) atrapa
- * tambien a AccountNotFoundException, MovementNotFoundException y
- * CustomerNotFoundException. Por eso agregar una excepcion nueva no obliga a
- * tocar este archivo: basta con colgarla de la categoria correcta.
+ * There is one handler per CATEGORY, not per concrete exception. Spring
+ * dispatches polymorphically: @ExceptionHandler(ResourceNotFoundException.class)
+ * also catches AccountNotFoundException, MovementNotFoundException and
+ * CustomerNotFoundException. That is why adding a new exception does not force
+ * a change here: it only has to hang off the right category.
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
 
-    /** Unico sitio donde se arma el cuerpo del error. */
+    /** The single place where the error body is assembled. */
     private ResponseEntity<ErrorDto> build(HttpStatus status, String message, ServerWebExchange exchange) {
         ErrorDto body = new ErrorDto()
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
@@ -50,9 +50,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Los 4xx son flujo normal: alguien pidio algo que no existe o mando datos
-     * malos. Se loguean como warn y sin stacktrace, para que el ERROR del log
-     * siga significando "algo se rompio de nuestro lado".
+     * The 4xx responses are normal flow: somebody asked for something that does
+     * not exist or sent bad data. They are logged as warn and without a stack
+     * trace, so that ERROR in the log keeps meaning "something broke on our
+     * side".
      */
     private void logClientError(HttpStatus status, DomainException ex, ServerWebExchange exchange) {
         log.warn("{} {} -> {} [{}] {}",
@@ -78,9 +79,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 400 que no nace del dominio sino del framework: JSON mal formado, un UUID
-     * que no parsea en el path, o @Valid rechazando el body contra el contrato
-     * (WebExchangeBindException hereda de ServerWebInputException).
+     * A 400 that does not come from the domain but from the framework:
+     * malformed JSON, a UUID that does not parse in the path, or @Valid
+     * rejecting the body against the contract (WebExchangeBindException extends
+     * ServerWebInputException).
      */
     @ExceptionHandler(ServerWebInputException.class)
     public ResponseEntity<ErrorDto> handleMalformedRequest(ServerWebInputException ex, ServerWebExchange exchange) {
@@ -104,9 +106,10 @@ public class GlobalExceptionHandler {
 
     // ---------------------------------------------------------------- 422
     /**
-     * En Spring 7 la constante es UNPROCESSABLE_CONTENT; UNPROCESSABLE_ENTITY
-     * quedo deprecada. El mensaje sale intacto de la excepcion: para saldo
-     * insuficiente es el literal "Saldo no disponible" que exige el enunciado.
+     * In Spring 7 the constant is UNPROCESSABLE_CONTENT; UNPROCESSABLE_ENTITY
+     * was deprecated. The message leaves the exception untouched: for an
+     * insufficient balance it is the literal "Saldo no disponible" required by
+     * the specification.
      */
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ErrorDto> handleBusinessRule(BusinessRuleException ex, ServerWebExchange exchange) {
@@ -116,9 +119,9 @@ public class GlobalExceptionHandler {
 
     // ---------------------------------------------------------------- 502
     /**
-     * Aqui SI va stacktrace: el microservicio de clientes fallo y necesitamos la
-     * causa (timeout, DNS, 5xx) para diagnosticar. El servicio propio esta bien,
-     * por eso es 502 y no 500.
+     * Here a stack trace IS wanted: the customer microservice failed and the
+     * cause (timeout, DNS, 5xx) is needed to diagnose it. Our own service is
+     * fine, which is why this is a 502 and not a 500.
      */
     @ExceptionHandler(ExternalDependencyException.class)
     public ResponseEntity<ErrorDto> handleExternalDependency(ExternalDependencyException ex, ServerWebExchange exchange) {
@@ -128,9 +131,9 @@ public class GlobalExceptionHandler {
 
     // ---------------------------------------------------------------- 500
     /**
-     * Red de seguridad. Loguea el stacktrace completo, pero NUNCA devuelve
-     * ex.getMessage() al cliente: ese texto puede filtrar nombres de tablas,
-     * rutas de archivos o SQL.
+     * Safety net. It logs the full stack trace, but NEVER returns
+     * ex.getMessage() to the client: that text can leak table names, file paths
+     * or SQL.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDto> handleUnexpected(Exception ex, ServerWebExchange exchange) {

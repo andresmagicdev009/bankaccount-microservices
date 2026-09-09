@@ -11,19 +11,11 @@ import org.springframework.data.domain.Pageable;
 import com.application.service.domain.movement.entity.Movement;
 
 /**
- * PASO 1.7 - Puerto de salida hacia la persistencia de movimientos.
+ * Outbound port towards the persistence of movements.
  *
- * TODO: declara
- * Movement save(Movement movement);
- * Optional<Movement> findById(String movementId);
- * Page<Movement> findAll(String accountNumber, List<String> accountNumbers,
- * LocalDateTime from, LocalDateTime to, Pageable pageable);
- * -> los 4 filtros del GET /movements son opcionales; null = sin filtro.
- * accountNumbers sirve para filtrar por cliente (sus cuentas).
- * List<Movement> findByAccountAndRange(String accountNumber,
- * LocalDateTime from, LocalDateTime to);
- * -> para el reporte, ordenado por fecha ascendente.
- * void deleteById(String movementId);
+ * The four filters of GET /movements are optional; null means no filter.
+ * accountNumbers is what allows filtering by customer (their accounts), and
+ * findByAccountAndRange feeds the report, ordered by ascending date.
  */
 public interface MovementRepositoryPort {
     Movement save(Movement movement);
@@ -37,20 +29,21 @@ public interface MovementRepositoryPort {
             LocalDateTime from, LocalDateTime to);
 
     /**
-     * Saldo resultante del ultimo movimiento de la cuenta, o vacio si todavia no
-     * tiene ninguno -en ese caso el saldo disponible es el saldo inicial-.
+     * Balance resulting from the last movement of the account, or empty when it
+     * has none yet -in that case the available balance is the initial balance-.
      *
-     * Esta es la unica fuente del saldo disponible: el enunciado lo modela como
-     * el campo "saldo" del movimiento, no como una columna de account.
+     * This is the single source of the available balance: the specification
+     * models it as the "saldo" field of the movement, not as a column of
+     * account.
      */
     Optional<BigDecimal> findLatestBalance(String accountNumber);
 
     /**
-     * Ultimo movimiento de la cuenta, o vacio si todavia no tiene ninguno.
+     * Last movement of the account, or empty when it has none yet.
      *
-     * Lo usa MovementService para permitir editar o borrar solo el ultimo:
-     * findLatestBalance devuelve el saldo pero no el id, y para esa regla hace
-     * falta el id.
+     * MovementService uses it to allow editing or deleting only the last one:
+     * findLatestBalance returns the balance but not the id, and that rule needs
+     * the id.
      */
     Optional<Movement> findLatest(String accountNumber);
 

@@ -6,11 +6,11 @@ import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.InvalidInputException;
 
 /**
- * PASO 1.13 - Regla F2: el valor del movimiento debe ser estrictamente mayor a
- * cero -> 400.
+ * Rule F2: the movement value must be strictly greater than zero -> 400.
  *
- * Por que 400 y no 422: se rechaza sin mirar el estado de la cuenta, asi que es
- * entrada invalida. El 422 queda solo para InsufficientBalanceException.
+ * Why 400 and not 422: it is rejected without looking at the state of the
+ * account, so it is invalid input. The 422 is left for
+ * InsufficientBalanceException alone.
  */
 public class InvalidMovementValueException extends InvalidInputException {
 

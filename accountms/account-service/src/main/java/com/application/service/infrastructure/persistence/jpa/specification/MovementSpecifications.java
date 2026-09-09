@@ -11,10 +11,10 @@ import com.application.service.infrastructure.persistence.jpa.entity.MovementEnt
 import jakarta.persistence.criteria.Predicate;
 
 /**
- * Filtros opcionales del GET /movements, armados con Criteria.
+ * Optional filters of GET /movements, assembled with Criteria.
  *
- * Regla: un filtro null no agrega predicado. Asi la misma consulta sirve para
- * "todos los movimientos" y para cualquier combinacion de los 4 filtros.
+ * Rule: a null filter adds no predicate. That way the same query serves "every
+ * movement" and any combination of the 4 filters.
  */
 public final class MovementSpecifications {
 
@@ -34,10 +34,10 @@ public final class MovementSpecifications {
             }
 
             /*
-             * Caso borde: lista vacia significa "cliente sin cuentas", asi que el
-             * resultado debe ser vacio. Un IN () no es SQL valido y omitir el
-             * predicado devolveria TODOS los movimientos, que es justo lo contrario.
-             * disjunction() es un FALSE constante.
+             * Edge case: an empty list means "customer with no accounts", so the
+             * result must be empty. An IN () is not valid SQL, and omitting the
+             * predicate would return EVERY movement, which is the exact
+             * opposite. disjunction() is a constant FALSE.
              */
             if (accountNumbers != null) {
                 predicates.add(accountNumbers.isEmpty()

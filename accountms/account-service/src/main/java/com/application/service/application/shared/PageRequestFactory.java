@@ -7,10 +7,11 @@ import org.springframework.data.domain.Sort;
 import com.application.service.domain.shared.exception.InvalidPageSizeException;
 
 /**
- * PASO 5.1 - Utilidad compartida de paginacion.
+ * Shared pagination utility.
  *
- * Existe para que los tres servicios validen page/size igual, con los mismos
- * limites que declara el contrato (page >= 0, size entre 1 y 100, default 20).
+ * It exists so the three services validate page/size the same way, with the
+ * limits declared by the contract (page >= 0, size between 1 and 100, default
+ * 20).
  */
 public final class PageRequestFactory {
 
@@ -21,8 +22,9 @@ public final class PageRequestFactory {
     }
 
     /**
-     * Un page negativo se corrige a 0 (no hay dano), pero un size fuera de rango
-     * se rechaza con 400: silenciarlo devolveria una pagina distinta a la pedida.
+     * A negative page is corrected to 0 (no harm done), but a size out of range
+     * is rejected with a 400: swallowing it would return a page other than the
+     * one requested.
      */
     public static Pageable of(Integer page, Integer size, Sort sort) {
         int pageNumber = (page == null || page < 0) ? 0 : page;

@@ -1,13 +1,12 @@
 package com.application.service.domain.account.entity;
 
 /**
- * PASO 1.1 - Tipos de cuenta.
+ * Account types.
  *
- * TODO: declara las constantes SAVINGS y CHECKING.
- *       Deben llamarse igual que el enum del contrato (components/schemas/Account.accountType),
- *       asi el mapper REST puede traducir con valueOf(...) sin tablas de conversion.
+ * The constants are named exactly like the enum of the contract
+ * (components/schemas/Account.accountType), so the REST mapper can translate
+ * them with valueOf(...) and no conversion tables.
  */
 public enum AccountType {
-    // TODO: SAVINGS, CHECKING
     SAVINGS, CHECKING
 }

@@ -4,11 +4,11 @@ import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.ExternalDependencyException;
 
 /**
- * PASO 1.15 - El microservicio de clientes no respondio (timeout, conexion
- * rechazada, 5xx) -> 502, NO 500. La falla es de arriba, no nuestra.
+ * The customer microservice did not answer (timeout, refused connection, 5xx)
+ * -> 502, NOT 500. The failure is upstream, not ours.
  *
- * El cause es obligatorio: sin el pierdes el stacktrace del WebClient y al
- * depurar no distingues un timeout de un DNS caido.
+ * The cause is mandatory: without it the WebClient stack trace is lost and,
+ * while debugging, a timeout cannot be told apart from a dead DNS.
  */
 public class CustomerServiceUnavailableException extends ExternalDependencyException {
 

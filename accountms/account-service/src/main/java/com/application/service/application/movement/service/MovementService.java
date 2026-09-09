@@ -24,15 +24,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * PASO 5.3 - Casos de uso de movimientos. Aqui viven las reglas F2 y F3.
+ * Movement use cases. Rules F2 and F3 live here.
  *
- * Todo cambio de saldo pasa por applyToBalance: una sola puerta, una sola
- * validacion. create, update y delete solo deciden QUE delta aplicar.
+ * Every change of the balance goes through applyToBalance: one door, one
+ * validation. create, update and delete only decide WHICH delta to apply.
  *
- * Igual que AccountService: bloqueante a proposito -el borde reactivo esta en
- * el controller- y sin try/catch. Las excepciones de dominio suben enteras
- * hasta GlobalExceptionHandler, que ya traduce InsufficientBalanceException a
- * 422 con el texto literal "Saldo no disponible" (regla F3).
+ * Same as AccountService: blocking on purpose -the reactive boundary is in the
+ * controller- and free of try/catch. Domain exceptions travel up untouched to
+ * GlobalExceptionHandler, which already turns InsufficientBalanceException into
+ * a 422 carrying the literal text "Saldo no disponible" (rule F3).
  */
 @Service
 @RequiredArgsConstructor
@@ -40,32 +40,34 @@ import lombok.extern.slf4j.Slf4j;
 public class MovementService {
 
     /**
-     * Orden por defecto del listado: el mas reciente primero.
+     * Default ordering of the listing: most recent first.
      *
-     * El desempate por movementId no es cosmetico: la columna date tiene
-     * precision de segundo, asi que dos movimientos del mismo segundo
-     * quedarian en orden no determinista entre paginas.
+     * The tie-break on movementId is not cosmetic: the date column has
+     * second precision, so two movements within the same second would come out
+     * in a non-deterministic order across pages.
      */
     private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "date", "movementId");
 
     private final MovementRepositoryPort movementRepository;
 
     /**
-     * Colaborador: carga de entidades, validaciones y la puerta del saldo. El
-     * servicio se queda solo con el QUE de cada caso de uso.
+     * Collaborator: entity loading, validations and the door to the balance.
+     * The service keeps only the WHAT of each use case.
      */
     private final MovementHelpers movementHelpers;
 
     // ------------------------------------------------------------------ CREATE
 
     /**
-     * POST /movements. Regla F2 completa.
+     * POST /movements. Rule F2 in full.
      *
-     * El valor se valida antes de tocar la BD: se rechaza sin mirar la cuenta,
-     * asi que es entrada invalida (400) y no regla de negocio.
+     * The value is validated before touching the database: it is rejected
+     * without looking at the account, so it is invalid input (400) and not a
+     * business rule.
      *
-     * movementId, date y balance no vienen del cliente -son readOnly en el
-     * contrato y el MovementMapper los deja en null-: se asignan aqui.
+     * movementId, date and balance do not come from the client -they are
+     * readOnly in the contract and MovementMapper leaves them null-: they are
+     * assigned here.
      */
     @Transactional
     public Movement create(Movement movement) {
@@ -100,8 +102,8 @@ public class MovementService {
     /**
      * GET /movements?page&size&accountNumber&customerId&startDate&endDate.
      *
-     * Es la consulta del punto 5 del enunciado: movimientos por fechas y por
-     * usuario. Los cuatro filtros son opcionales; null = sin filtro.
+     * This is the query of point 5 of the specification: movements by date and
+     * by customer. The four filters are optional; null means no filter.
      */
     @Transactional(readOnly = true)
     public Page<Movement> list(String accountNumber, String customerId,
@@ -113,7 +115,7 @@ public class MovementService {
 
         List<String> accountNumbers = movementHelpers.resolveAccountNumbers(customerId);
 
-        // Cliente sin cuentas: no hay nada que buscar y un IN () vacio es SQL invalido.
+        // Customer with no accounts: nothing to look for, and an empty IN () is invalid SQL.
         if (accountNumbers != null && accountNumbers.isEmpty()) {
             return Page.empty(pageable);
         }
@@ -125,13 +127,14 @@ public class MovementService {
     // ------------------------------------------------------------------ UPDATE
 
     /**
-     * PUT /movements/{movementId} - reemplazo total.
+     * PUT /movements/{movementId} - full replacement.
      *
-     * Solo se puede editar el ultimo movimiento de la cuenta: ver
+     * Only the last movement of the account can be edited: see
      * requireLastMovement.
      *
-     * accountNumber no se mueve -cambiar un movimiento de cuenta descuadraria
-     * las dos- y date tampoco: es la fecha del hecho, no la de la edicion.
+     * accountNumber does not move -moving a movement between accounts would
+     * unbalance both- and neither does date: it is the date of the fact, not of
+     * the edit.
      */
     @Transactional
     public Movement update(String movementId, Movement changes) {
@@ -141,8 +144,8 @@ public class MovementService {
     }
 
     /**
-     * PATCH /movements/{movementId} - parcial. Null significa "conserva el valor
-     * actual".
+     * PATCH /movements/{movementId} - partial update. Null means "keep the
+     * current value".
      */
     @Transactional
     public Movement patch(String movementId, MovementType movementType, BigDecimal value) {
@@ -158,12 +161,12 @@ public class MovementService {
     // ------------------------------------------------------------------ DELETE
 
     /**
-     * DELETE /movements/{movementId} - reversa del movimiento.
+     * DELETE /movements/{movementId} - reversal of the movement.
      *
-     * Aplicar el signo contrario devuelve la cuenta exactamente al saldo que
-     * tenia antes, o sea al balance del movimiento que queda como ultimo. Va
-     * por applyToBalance como todo lo demas: la reversa de un credito baja el
-     * saldo y tambien tiene que respetar F3.
+     * Applying the opposite sign returns the account exactly to the balance it
+     * had before, that is, to the balance of the movement that becomes the last
+     * one. It goes through applyToBalance like everything else: reversing a
+     * credit lowers the balance and has to honour F3 as well.
      */
     @Transactional
     public void delete(String movementId) {
@@ -185,11 +188,11 @@ public class MovementService {
     // ----------------------------------------------------------------- HELPERS
 
     /**
-     * Tronco comun de update y patch: cambia tipo y/o valor del movimiento y
-     * recompone el saldo por la misma puerta que create.
+     * Common trunk of update and patch: it changes type and/or value of the
+     * movement and recomposes the balance through the same door as create.
      *
-     * El delta -nuevo menos viejo- hace que la validacion F3 siga siendo una
-     * sola: no hay que deshacer y rehacer en dos pasos.
+     * The delta -new minus old- keeps the F3 validation down to a single check:
+     * there is no undo-and-redo in two steps.
      */
     private Movement replaceAmount(Movement existing, MovementType movementType, BigDecimal value) {
         MovementType newType = (movementType == null) ? existing.getMovementType() : movementType;

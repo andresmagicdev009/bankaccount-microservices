@@ -22,15 +22,15 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * PASO 7.1 - Controller de cuentas.
+ * Accounts controller.
  *
- * Las rutas y los codigos de estado vienen de AccountsApi, generada del
- * contrato: aqui no hay ni un @GetMapping ni un @RequestMapping.
+ * The routes and the status codes come from AccountsApi, generated from the
+ * contract: there is not a single @GetMapping or @RequestMapping here.
  *
- * Este es el borde reactivo. El trabajo bloqueante (JPA) no se ejecuta en el
- * event loop: pasa por BlockingBridge, que lo empuja al jdbcScheduler.
+ * This is the reactive edge. The blocking work (JPA) does not run on the event
+ * loop: it goes through BlockingBridge, which pushes it to the jdbcScheduler.
  *
- * No hay try/catch: las excepciones de dominio suben hasta
+ * There is no try/catch: domain exceptions travel up to
  * GlobalExceptionHandler.
  */
 @RestController
@@ -43,14 +43,14 @@ public class AccountController implements AccountsApi {
     private final BlockingBridge blocking;
 
     /**
-     * POST /accounts -> 201 con cabecera Location.
+     * POST /accounts -> 201 with a Location header.
      *
-     * El body llega como Mono porque el contrato es reactivo: hasta que no se
-     * suscribe no hay DTO. De ahi el map para traducirlo y el flatMap para
-     * encadenar el trabajo bloqueante, que ya devuelve otro Mono.
+     * The body arrives as a Mono because the contract is reactive: there is no
+     * DTO until it is subscribed to. Hence the map to translate it and the
+     * flatMap to chain the blocking work, which already returns another Mono.
      */
     @Override
-    public Mono<ResponseEntity<AccountDto>> createAccount(Mono<AccountCreateDto> accountCreateDto,
+    public Mono<ResponseEntity<AccountDto>> postAccount(Mono<AccountCreateDto> accountCreateDto,
             ServerWebExchange exchange) {
         return accountCreateDto
                 .map(accountMapper::toDomain)
@@ -69,11 +69,12 @@ public class AccountController implements AccountsApi {
     }
 
     /**
-     * El contrato declara customerId como UUID y el dominio lo guarda como
-     * String: se convierte aqui, no en el servicio. Null = sin filtro.
+     * The contract declares customerId as a UUID and the domain stores it as a
+     * String: the conversion happens here, not in the service. Null means no
+     * filter.
      */
     @Override
-    public Mono<ResponseEntity<AccountPageDto>> listAccounts(Integer page, Integer size, UUID customerId,
+    public Mono<ResponseEntity<AccountPageDto>> getAccounts(Integer page, Integer size, UUID customerId,
             ServerWebExchange exchange) {
         String customer = (customerId == null) ? null : customerId.toString();
 
@@ -83,7 +84,7 @@ public class AccountController implements AccountsApi {
     }
 
     @Override
-    public Mono<ResponseEntity<AccountDto>> updateAccount(String accountNumber,
+    public Mono<ResponseEntity<AccountDto>> putAccount(String accountNumber,
             Mono<AccountUpdateDto> accountUpdateDto, ServerWebExchange exchange) {
         return accountUpdateDto
                 .map(accountMapper::toDomain)
@@ -93,9 +94,9 @@ public class AccountController implements AccountsApi {
     }
 
     /**
-     * El PATCH no pasa por un Account: sus campos nulos significan "no cambies
-     * esto", y un Account a medio llenar no sabria distinguir eso de un "ponlo
-     * a null". Por eso el servicio recibe los dos campos sueltos.
+     * The PATCH does not go through a Account: its null fields mean "do not change
+     * this", and a half-filled Account could not tell that apart from "set it to
+     * null". That is why the service receives the two fields loose.
      */
     @Override
     public Mono<ResponseEntity<AccountDto>> patchAccount(String accountNumber,
@@ -108,7 +109,7 @@ public class AccountController implements AccountsApi {
                 .map(ResponseEntity::ok);
     }
 
-    /** delete no devuelve nada: el Mono vacio dispara el 204. */
+    /** delete returns nothing: the empty Mono triggers the 204. */
     @Override
     public Mono<ResponseEntity<Void>> deleteAccount(String accountNumber, ServerWebExchange exchange) {
         return blocking.run(() -> accountService.delete(accountNumber))

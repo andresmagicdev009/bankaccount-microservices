@@ -10,46 +10,42 @@ import org.springframework.data.domain.Pageable;
 import com.application.service.domain.account.entity.Account;
 
 /**
- * PASO 1.6 - Puerto de salida hacia la persistencia de cuentas.
+ * Outbound port towards the persistence of accounts.
  *
- * Por que una interfaz aqui y no usar JpaRepository directo en el servicio:
- * el dominio declara QUE necesita; infraestructura decide COMO (hoy JPA, manana
- * lo que sea). Asi la capa application no depende de Spring Data.
+ * Why an interface here instead of using JpaRepository straight from the
+ * service: the domain declares WHAT it needs; infrastructure decides HOW (JPA
+ * today, whatever comes tomorrow). That keeps the application layer independent
+ * of Spring Data.
  *
- * TODO: declara los metodos (todos devuelven/reciben tipos de DOMINIO, nunca
- * Entity)
- * Account save(Account account);
- * Optional<Account> findByAccountNumber(String accountNumber);
- * boolean existsByAccountNumber(String accountNumber);
- * List<Account> findByCustomerId(String customerId); -> lo usa el reporte
- * Page<Account> findAll(String customerId, Pageable pageable);
- * void deleteByAccountNumber(String accountNumber);
+ * Every method takes and returns DOMAIN types, never entities.
  *
- * Nota: Page y Pageable de Spring Data si se permiten aqui (es lo que hace
- * customerms). Si quieres el dominio 100% puro, tendrias que crear tu propio
- * tipo de paginacion; para este proyecto no vale la pena.
+ * Note: Page and Pageable from Spring Data are allowed here (the same choice
+ * customerms makes). A 100% pure domain would need a pagination type of its
+ * own; for this project that is not worth it.
  */
 public interface AccountRepositoryPort {
     
     Account save(Account account);
 
     /**
-     * Escritura dedicada del saldo disponible: es la unica que toca esa columna.
+     * Dedicated write of the available balance: the only one touching that
+     * column.
      *
-     * No va por save(Account) a proposito. save copia todo el estado de la
-     * cuenta, asi que un PUT /accounts que hubiera leido la fila antes de un
-     * movimiento reescribiria el saldo viejo encima del nuevo. Separando la
-     * escritura, el CRUD de cuentas ya no puede pisar el saldo ni por descuido.
+     * It does not go through save(Account) on purpose. save copies the whole
+     * state of the account, so a PUT /accounts that had read the row before a
+     * movement would write the old balance over the new one. With the write
+     * separated, the account CRUD can no longer overwrite the balance by
+     * accident.
      */
     void updateAvailableBalance(String accountNumber, BigDecimal availableBalance);
 
     Optional<Account> findByAccountNumber(String accountNumber);
 
     /**
-     * Igual que findByAccountNumber pero bloqueando la fila hasta el COMMIT.
+     * Same as findByAccountNumber but locking the row until COMMIT.
      *
-     * Lo usa todo el que vaya a mover el saldo. Solo tiene sentido dentro de una
-     * transaccion: sin ella el bloqueo se libera de inmediato.
+     * Used by everyone about to move the balance. It only makes sense inside a
+     * transaction: without one the lock is released immediately.
      */
     Optional<Account> findByAccountNumberForUpdate(String accountNumber);
 

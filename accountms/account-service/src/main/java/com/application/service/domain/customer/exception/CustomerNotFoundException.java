@@ -3,7 +3,7 @@ package com.application.service.domain.customer.exception;
 import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.ResourceNotFoundException;
 
-/** PASO 1.14 - El microservicio de clientes respondio 404 para ese id -> 404 aqui. */
+/** The customer microservice answered 404 for that id -> 404 here as well. */
 public class CustomerNotFoundException extends ResourceNotFoundException {
 
     public CustomerNotFoundException(String customerId) {

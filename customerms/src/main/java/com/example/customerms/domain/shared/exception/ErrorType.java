@@ -1,21 +1,21 @@
 package com.example.customerms.domain.shared.exception;
 
 /**
- * Categoria del error, en lenguaje de dominio.
+ * Error category, expressed in domain language.
  *
- * El dominio no importa nada de Spring ni de HTTP: dice QUE clase de error es y
- * el advice decide con que status responderlo. Asi el mapeo a 404/400/409 vive
- * en un solo sitio de la capa de presentacion, y una excepcion nueva solo tiene
- * que elegir su categoria.
+ * The domain imports nothing from Spring or HTTP: it states WHAT kind of error
+ * this is and the advice decides which status to answer with. That way the
+ * mapping to 404/400/409 lives in a single place of the presentation layer, and
+ * a new exception only has to pick its category.
  */
 public enum ErrorType {
 
-    /** El recurso pedido no existe -> 404. */
+    /** The requested resource does not exist -> 404. */
     NOT_FOUND,
 
-    /** Los datos de entrada no son validos -> 400. */
+    /** The input data is not valid -> 400. */
     INVALID_INPUT,
 
-    /** Choca con el estado actual del recurso, p.ej. un duplicado -> 409. */
+    /** Clashes with the current state of the resource, e.g. a duplicate -> 409. */
     CONFLICT
 }

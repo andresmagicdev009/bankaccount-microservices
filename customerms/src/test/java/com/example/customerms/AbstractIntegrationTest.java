@@ -5,27 +5,28 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.context.annotation.Import;
 
 /**
- * Base de los tests que necesitan la aplicacion entera contra MySQL real.
+ * Base class for the tests that need the whole application against a real MySQL.
  *
- * Existe por el cache de contextos de Spring: la clave de cache se arma con la
- * configuracion combinada de la clase de test, asi que dos clases con
- * anotaciones identicas comparten contexto -y, por tanto, un unico contenedor
- * MySQL, arrancado una sola vez para toda la suite. En cuanto una clase cambia
- * una property o el webEnvironment, se abre un contexto nuevo y se paga otro
- * arranque de Docker. Heredar de aqui evita que eso pase por descuido.
+ * It exists because of Spring's context cache: the cache key is built from the
+ * combined configuration of the test class, so two classes with identical
+ * annotations share a context -and therefore a single MySQL container, started
+ * once for the entire suite. As soon as one class changes a property or the
+ * webEnvironment, a new context is opened and another Docker startup is paid
+ * for. Extending this class keeps that from happening by accident.
  *
- * Que aporta cada anotacion:
+ * What each annotation contributes:
  *
- * - @Import(TestcontainersConfiguration): levanta el contenedor y @ServiceConnection
- *   apunta spring.datasource.* hacia el. Flyway aplica V1__init_schema.sql y
- *   ddl-auto=validate comprueba que las entidades cuadren con esa migracion.
- * - RANDOM_PORT: servidor Netty de verdad, no un mock. El request cruza el event
- *   loop y BlockingBridge igual que en produccion.
- * - @AutoConfigureWebTestClient: en Boot 4 el soporte de WebTestClient se movio
- *   a su propio modulo y ya no basta con RANDOM_PORT para tener el bean.
+ * - @Import(TestcontainersConfiguration): starts the container, and
+ *   @ServiceConnection points spring.datasource.* at it. Flyway applies
+ *   V1__init_schema.sql and ddl-auto=validate checks that the entities match
+ *   that migration.
+ * - RANDOM_PORT: a real Netty server, not a mock. The request crosses the event
+ *   loop and BlockingBridge exactly as it does in production.
+ * - @AutoConfigureWebTestClient: in Boot 4 the WebTestClient support moved to
+ *   its own module and RANDOM_PORT alone no longer provides the bean.
  *
- * Las subclases NO deben anotarse con @SpringBootTest ni repetir estas
- * anotaciones: cualquier diferencia rompe el contexto compartido.
+ * Subclasses must NOT be annotated with @SpringBootTest nor repeat these
+ * annotations: any difference breaks the shared context.
  */
 @Import(TestcontainersConfiguration.class)
 @AutoConfigureWebTestClient

@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 import com.application.service.domain.shared.constant.ErrorCode;
 
-/** PASO 1.17 - startDate posterior a endDate -> 400. */
+/** startDate later than endDate -> 400. */
 public class InvalidDateRangeException extends InvalidInputException {
 
     public InvalidDateRangeException(LocalDate startDate, LocalDate endDate) {

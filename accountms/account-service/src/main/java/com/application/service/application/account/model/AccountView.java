@@ -5,18 +5,20 @@ import java.math.BigDecimal;
 import com.application.service.domain.account.entity.Account;
 
 /**
- * PASO 5.1 - Cuenta mas su saldo disponible, ya resuelto.
+ * An account plus its available balance, already resolved.
  *
- * Existe porque el saldo disponible no es un campo de Account: el enunciado lo
- * modela como el campo "saldo" del movimiento. Pero el contrato SI lo expone en
- * la respuesta (availableBalance es readOnly), asi que alguien tiene que juntar
- * las dos cosas sin ensuciar el dominio. Ese alguien es este record.
+ * It exists because the available balance is not a field of Account: the
+ * specification models it as the "saldo" field of the movement. The contract,
+ * however, DOES expose it in the response (availableBalance is readOnly), so
+ * somebody has to put the two together without polluting the domain. That
+ * somebody is this record.
  *
- * Vive en application y no en domain a proposito: es un resultado de caso de
- * uso, no una regla de negocio.
+ * It lives in application and not in domain on purpose: it is a use-case
+ * result, not a business rule.
  *
- * @param account          la cuenta tal como esta persistida
- * @param availableBalance saldo del ultimo movimiento; el inicial si no tiene
+ * @param account          the account exactly as persisted
+ * @param availableBalance balance of the last movement; the initial one when
+ *                         there is none
  */
 public record AccountView(Account account, BigDecimal availableBalance) {
 }

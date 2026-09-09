@@ -18,10 +18,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * PASO 2.2 - Tabla movement.
+ * Table movement.
  *
- * Decision de diseno: se guarda el accountNumber plano en vez de @ManyToOne a
- * AccountEntity. Es mas simple y evita lazy loading.
+ * Design decision: the plain accountNumber is stored instead of a @ManyToOne to
+ * AccountEntity. It is simpler and avoids lazy loading.
  */
 @Entity
 @Table(name = "movement")
@@ -34,7 +34,7 @@ public class MovementEntity {
     @Column(name = "id", length = 36, nullable = false, updatable = false)
     private String movementId;
 
-    /** La columna en BD se llama date (ver schema.sql); el campo Java se llama date. */
+    /** The column in the database is named date (see the schema), like the Java field. */
     @Column(name = "date", nullable = false)
     private LocalDateTime date;
 
@@ -45,7 +45,7 @@ public class MovementEntity {
     @Column(name = "value", nullable = false, precision = 15, scale = 2)
     private BigDecimal value;
 
-    /** Saldo de la cuenta DESPUES de aplicar este movimiento. Dato historico congelado. */
+    /** Balance of the account AFTER applying this movement. A frozen historical value. */
     @Column(name = "balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal balance;
 
@@ -53,8 +53,8 @@ public class MovementEntity {
     private String accountNumber;
 
     /**
-     * Auditoria: cuando se inserto la fila. No confundir con date, que es la
-     * fecha de negocio del movimiento y la puede fijar el cliente.
+     * Audit: when the row was inserted. Not to be confused with date, which is
+     * the business date of the movement and can be set by the client.
      */
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

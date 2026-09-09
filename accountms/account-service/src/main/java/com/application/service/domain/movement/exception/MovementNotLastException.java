@@ -4,16 +4,15 @@ import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.StateConflictException;
 
 /**
- * PASO 1.14 - Solo el ultimo movimiento de una cuenta se puede editar o borrar
- * -> 409.
+ * Only the last movement of an account can be edited or deleted -> 409.
  *
- * El campo balance de cada movimiento es el saldo DESPUES de aplicarlo: un dato
- * historico congelado. Si se modificara un movimiento intermedio, todos los
- * balance posteriores quedarian mal y habria que recalcular la cadena entera.
- * Bloquearlo es mas barato y mas honesto que recalcular en silencio.
+ * The balance field of each movement is the balance AFTER applying it: a frozen
+ * historical value. Modifying a movement in the middle would leave every later
+ * balance wrong and would force recomputing the whole chain. Blocking it is
+ * cheaper and more honest than silently recomputing.
  *
- * Por que 409 y no 422: el recurso existe y la peticion es valida; lo que no
- * permite la operacion es el estado -su posicion en la cuenta-.
+ * Why 409 and not 422: the resource exists and the request is valid; what does
+ * not allow the operation is the state -its position within the account-.
  */
 public class MovementNotLastException extends StateConflictException {
 

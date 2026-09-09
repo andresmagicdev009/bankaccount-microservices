@@ -40,16 +40,16 @@ import com.application.service.domain.customer.port.CustomerLookupPort;
 import com.application.service.domain.shared.exception.InvalidPageSizeException;
 
 /**
- * Pruebas unitarias de AccountService: crear, actualizar y listar.
+ * Unit tests for AccountService: create, update and list.
  *
- * Unitarias de verdad -sin contexto de Spring y sin base de datos-: los tres
- * colaboradores son puertos, o sea interfaces, y por eso se pueden doblar con
- * Mockito sin levantar infraestructura.
+ * Truly unit tests -no Spring context and no database-: the three collaborators
+ * are ports, that is, interfaces, which is why they can be doubled with Mockito
+ * without starting any infrastructure.
  *
- * Casi todos los casos verifican la misma pareja: el objeto que el servicio
- * manda a persistir (ArgumentCaptor) y la vista que devuelve. El saldo
- * disponible es la columna available_balance de la propia cuenta, asi que
- * viaja en la fixture y no en un stub aparte.
+ * Almost every case verifies the same pair: the object the service sends to be
+ * persisted (ArgumentCaptor) and the view it returns. The available balance is
+ * the available_balance column of the account itself, so it travels in the
+ * fixture and not in a separate stub.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AccountService")
@@ -75,14 +75,15 @@ class AccountServiceTest {
         accountService = new AccountService(accountRepository, customerLookup, accountHelpers);
     }
 
-    /** Cuenta ya persistida: lo que devolveria el repositorio. */
+    /** An already persisted account: what the repository would return. */
     private Account existingAccount() {
         return existingAccount("1000.00");
     }
 
     /**
-     * La misma cuenta, abierta con 1000, pero con el saldo disponible que se le
-     * indique: es lo que distingue una cuenta intacta de una que ya opero.
+     * The same account, opened with 1000, but with whichever available balance
+     * is passed in: that is what tells an untouched account from one that has
+     * already moved money.
      */
     private Account existingAccount(String availableBalance) {
         return Account.builder()
@@ -110,8 +111,8 @@ class AccountServiceTest {
     class Create {
 
         @Test
-        @DisplayName("asigna el numero generado e ignora el que mande el cliente")
-        void asignaNumeroGeneradoEIgnoraElDelCliente() {
+        @DisplayName("assigns the generated number and ignores the one sent by the client")
+        void assignsGeneratedNumberAndIgnoresClientOne() {
             Account request = Account.builder()
                     .accountNumber("NUMERO-INVENTADO-POR-EL-CLIENTE")
                     .accountType(AccountType.SAVINGS)
@@ -131,8 +132,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("status null se guarda como true")
-        void statusNullQuedaActiva() {
+        @DisplayName("a null status is stored as true")
+        void nullStatusBecomesActive() {
             Account request = Account.builder()
                     .accountType(AccountType.CHECKING)
                     .initialBalance(new BigDecimal("500.00"))
@@ -151,8 +152,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("status false explicito se respeta")
-        void statusFalseSeRespeta() {
+        @DisplayName("an explicit false status is honoured")
+        void explicitFalseStatusIsHonoured() {
             Account request = Account.builder()
                     .accountType(AccountType.CHECKING)
                     .initialBalance(new BigDecimal("500.00"))
@@ -171,8 +172,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("cuenta recien creada: saldo disponible == saldo inicial")
-        void saldoDisponibleInicialEsElDeApertura() {
+        @DisplayName("freshly created account: available balance == initial balance")
+        void initialAvailableBalanceIsTheOpeningOne() {
             Account request = Account.builder()
                     .accountType(AccountType.SAVINGS)
                     .initialBalance(new BigDecimal("2000.00"))
@@ -185,16 +186,16 @@ class AccountServiceTest {
 
             AccountView view = accountService.create(request);
 
-            // La regla: al crear, el disponible arranca igual al de apertura.
-            // Tiene que quedar en la fila, no solo en la respuesta.
+            // The rule: on creation, the available balance starts equal to the
+            // opening one. It has to land in the row, not only in the response.
             verify(accountRepository).save(savedAccount.capture());
             assertThat(savedAccount.getValue().getAvailableBalance()).isEqualByComparingTo("2000.00");
             assertThat(view.availableBalance()).isEqualByComparingTo("2000.00");
         }
 
         @Test
-        @DisplayName("cliente inexistente: 404 y no se persiste nada")
-        void clienteInexistenteNoPersiste() {
+        @DisplayName("unknown customer: 404 and nothing is persisted")
+        void unknownCustomerDoesNotPersist() {
             Account request = Account.builder()
                     .accountType(AccountType.SAVINGS)
                     .initialBalance(new BigDecimal("100.00"))
@@ -218,8 +219,8 @@ class AccountServiceTest {
     class Update {
 
         @Test
-        @DisplayName("pisa tipo y estado, y NO toca el saldo inicial")
-        void pisaTipoYEstadoPeroNoElSaldoInicial() {
+        @DisplayName("overwrites type and status, and does NOT touch the initial balance")
+        void overwritesTypeAndStatusButNotInitialBalance() {
             Account changes = Account.builder()
                     .accountType(AccountType.CHECKING)
                     .initialBalance(new BigDecimal("999999.00")) // readOnly: debe ignorarse
@@ -239,8 +240,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("cambiar de cliente revalida el nuevo customerId")
-        void cambioDeClienteRevalida() {
+        @DisplayName("changing customer revalidates the new customerId")
+        void customerChangeIsRevalidated() {
             Account changes = Account.builder().customerId("CUS-2").build();
 
             when(accountRepository.findByAccountNumber(ACCOUNT_NUMBER)).thenReturn(Optional.of(existingAccount()));
@@ -255,8 +256,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("el mismo customerId no gasta una llamada al microservicio de clientes")
-        void mismoClienteNoRevalida() {
+        @DisplayName("the same customerId does not spend a call to the customer microservice")
+        void sameCustomerIsNotRevalidated() {
             Account changes = Account.builder()
                     .customerId(CUSTOMER_ID)
                     .accountType(AccountType.CHECKING)
@@ -271,8 +272,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("cliente nuevo inexistente: 404 y no se persiste nada")
-        void clienteNuevoInexistenteNoPersiste() {
+        @DisplayName("unknown new customer: 404 and nothing is persisted")
+        void unknownNewCustomerDoesNotPersist() {
             Account changes = Account.builder().customerId("CUS-FANTASMA").build();
 
             when(accountRepository.findByAccountNumber(ACCOUNT_NUMBER)).thenReturn(Optional.of(existingAccount()));
@@ -285,8 +286,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("cuenta inexistente: 404")
-        void cuentaInexistente() {
+        @DisplayName("unknown account: 404")
+        void unknownAccount() {
             when(accountRepository.findByAccountNumber("NO-EXISTE")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> accountService.update("NO-EXISTE", Account.builder().build()))
@@ -296,9 +297,9 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("la vista devuelve el saldo disponible, no el de apertura")
-        void laVistaDevuelveElSaldoDisponible() {
-            // Cuenta abierta con 1000 que ya opero y quedo en 700.
+        @DisplayName("the view returns the available balance, not the opening one")
+        void viewReturnsTheAvailableBalance() {
+            // Account opened with 1000 that already moved money and sits at 700.
             when(accountRepository.findByAccountNumber(ACCOUNT_NUMBER))
                     .thenReturn(Optional.of(existingAccount("700.00")));
             when(accountRepository.save(any(Account.class))).thenAnswer(call -> call.getArgument(0));
@@ -310,8 +311,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("editar la cuenta no altera su saldo disponible")
-        void editarNoAlteraElSaldo() {
+        @DisplayName("editing the account does not alter its available balance")
+        void editingDoesNotAlterTheBalance() {
             when(accountRepository.findByAccountNumber(ACCOUNT_NUMBER))
                     .thenReturn(Optional.of(existingAccount("700.00")));
             when(accountRepository.save(any(Account.class))).thenAnswer(call -> call.getArgument(0));
@@ -331,10 +332,10 @@ class AccountServiceTest {
     class ListAccounts {
 
         @Test
-        @DisplayName("resuelve el saldo disponible de cada fila")
-        void resuelveElSaldoDeCadaFila() {
+        @DisplayName("resolves the available balance of every row")
+        void resolvesTheBalanceOfEveryRow() {
             Account first = existingAccount("700.00");
-            // Cuenta sin available_balance: fila anterior a la columna.
+            // Account without available_balance: a row predating the column.
             Account second = Account.builder()
                     .accountNumber("100000043")
                     .accountType(AccountType.CHECKING)
@@ -355,8 +356,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("sin page ni size: pagina 0, tamano 20, mas recientes primero")
-        void paginacionPorDefecto() {
+        @DisplayName("without page or size: page 0, size 20, most recent first")
+        void defaultPagination() {
             ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
             when(accountRepository.findAll(eq(null), any(Pageable.class))).thenReturn(Page.empty());
 
@@ -369,8 +370,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("page negativo se corrige a 0 en vez de fallar")
-        void pageNegativoSeCorrige() {
+        @DisplayName("a negative page is corrected to 0 instead of failing")
+        void negativePageIsCorrected() {
             ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
             when(accountRepository.findAll(eq(null), any(Pageable.class))).thenReturn(Page.empty());
 
@@ -381,8 +382,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("size fuera de rango: 400 y no se consulta la BD")
-        void sizeFueraDeRango() {
+        @DisplayName("size out of range: 400 and the database is not queried")
+        void sizeOutOfRange() {
             assertThatThrownBy(() -> accountService.list(null, 0, 500))
                     .isInstanceOf(InvalidPageSizeException.class);
 
@@ -390,8 +391,8 @@ class AccountServiceTest {
         }
 
         @Test
-        @DisplayName("pagina vacia: se devuelve vacia sin reventar")
-        void paginaVaciaSeDevuelveVacia() {
+        @DisplayName("empty page: returned empty without blowing up")
+        void emptyPageIsReturnedEmpty() {
             when(accountRepository.findAll(eq(CUSTOMER_ID), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 

@@ -7,12 +7,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * PASO 4.1 - Forma del JSON que devuelve el microservicio de clientes.
+ * Shape of the JSON returned by the customer microservice.
  *
- * No es el modelo de dominio ni un DTO del contrato propio: es la forma del dato
- * ajeno, y por eso vive en infrastructure.
+ * It is neither the domain model nor a DTO of our own contract: it is the shape
+ * of data owned by somebody else.
  *
- * ignoreUnknown: si el otro equipo agrega campos, la deserializacion no se rompe.
+ * ignoreUnknown: if the other team adds fields, deserialization does not break.
  */
 @Getter
 @Setter

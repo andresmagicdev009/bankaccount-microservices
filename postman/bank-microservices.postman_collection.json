@@ -1,0 +1,1510 @@
+{
+  "info": {
+    "name": "Bank Microservices — Customers & Accounts",
+    "_postman_id": "b4a1d2c8-7f3e-4a6b-9c15-2d8e0f5a3b71",
+    "description": "Endpoint tests for the two microservices of the technical test.\n\n**Order matters.** The folders are numbered and chain through collection variables: `01 · Customers` stores `{{customerId}}`, `02 · Accounts` stores `{{accountNumber}}`, `03 · Movements` stores `{{movementId}}`. Running the whole collection top to bottom (Postman Runner or Newman) exercises the happy path, every error code of the contract and the business rules F2/F3, then leaves the database clean.\n\n**Before running:** start both services (`docker compose up --build`) and check `00 · Health`.\n\n**Variables** — defaults point at the ports published by docker-compose:\n- `customersUrl` = http://localhost:8081/api/v1\n- `accountsUrl` = http://localhost:8082/api/v1\n\nEvery request carries assertions, so the collection also runs headless:\n`newman run postman/bank-microservices.postman_collection.json`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "customersUrl",
+      "value": "http://localhost:8081/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accountsUrl",
+      "value": "http://localhost:8082/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accountNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "movementId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 · Health",
+      "description": "Actuator of both services. Run these first: if they do not answer, nothing else will.",
+      "item": [
+        {
+          "name": "GET customers health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/actuator/health",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"service UP\", function () { pm.expect(body.status).to.eql(\"UP\"); });",
+                  "pm.test(\"database UP\", function () { pm.expect(body.components.db.status).to.eql(\"UP\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET accounts health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/actuator/health",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"service UP\", function () { pm.expect(body.status).to.eql(\"UP\"); });",
+                  "pm.test(\"database UP\", function () { pm.expect(body.components.db.status).to.eql(\"UP\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 · Customers",
+      "description": "CRUD of the customer microservice (port 8081). The POST stores the customer id in the {{customerId}} collection variable, which every later request reuses.",
+      "item": [
+        {
+          "name": "POST /customers — create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{customersUrl}}/customers",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jose Lema\",\n  \"gender\": \"MALE\",\n  \"identification\": \"0102030405\",\n  \"address\": \"Otavalo sn y principal\",\n  \"phone\": \"098254785\",\n  \"password\": \"1234\",\n  \"status\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Inserts the person row and the customer row in a single transaction. `status` defaults to true when omitted; `password` is writeOnly, so it never comes back."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"customerId\", body.id);",
+                  "pm.test(\"id is a UUID assigned by the server\", function () {",
+                  "    pm.expect(body.id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "});",
+                  "pm.test(\"Location header points at the new resource\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/customers/\" + body.id);",
+                  "});",
+                  "pm.test(\"password is never returned\", function () {",
+                  "    pm.expect(body).to.not.have.property(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /customers — 409 duplicate identification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{customersUrl}}/customers",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jose Lema\",\n  \"gender\": \"MALE\",\n  \"identification\": \"0102030405\",\n  \"address\": \"Otavalo sn y principal\",\n  \"phone\": \"098254785\",\n  \"password\": \"1234\",\n  \"status\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Same identification as the previous request. The unique constraint uq_person_identification is enforced by CustomerService and surfaces as a 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error body follows the contract\", function () {",
+                  "    pm.expect(body.status).to.eql(409);",
+                  "    pm.expect(body.error).to.eql(\"Conflict\");",
+                  "    pm.expect(body.message).to.include(\"0102030405\");",
+                  "    pm.expect(body.path).to.eql(\"/api/v1/customers\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"returns the customer that was created\", function () {",
+                  "    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"customerId\"));",
+                  "    pm.expect(body.name).to.eql(\"Jose Lema\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers — list paginated",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/customers?page=0&size=20&status=true",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "The three query params are optional. page defaults to 0 and size to 20; a size outside 1..100 is rejected with a 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"page envelope is complete\", function () {",
+                  "    pm.expect(body).to.have.all.keys(\"content\", \"page\", \"size\", \"totalElements\", \"totalPages\");",
+                  "    pm.expect(body.content).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers — 400 size out of range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/customers?size=101",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "101"
+                }
+              ]
+            },
+            "description": "The contract caps size at 100. Validation stops before the database is queried."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"message explains the range\", function () {",
+                  "    pm.expect(body.message).to.include(\"1 and 100\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /customers/{id} — full replacement",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{customersUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jose Lema Editado\",\n  \"gender\": \"OTHER\",\n  \"identification\": \"0102030405\",\n  \"address\": \"Amazonas y NNUU\",\n  \"phone\": \"097777777\",\n  \"password\": \"nuevo-password\",\n  \"status\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PUT replaces every editable field; `password` is required by the contract, so it always travels. The id and createdAt survive untouched."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"fields were replaced, id kept\", function () {",
+                  "    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"customerId\"));",
+                  "    pm.expect(body.name).to.eql(\"Jose Lema Editado\");",
+                  "    pm.expect(body.gender).to.eql(\"OTHER\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /customers/{id} — partial",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{customersUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"099999999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Absent fields keep their current value. Only the phone changes here."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"only the sent field changed\", function () {",
+                  "    pm.expect(body.phone).to.eql(\"099999999\");",
+                  "    pm.expect(body.name).to.eql(\"Jose Lema Editado\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id} — 404 unknown id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/customers/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error body follows the contract\", function () {",
+                  "    pm.expect(body.status).to.eql(404);",
+                  "    pm.expect(body.error).to.eql(\"Not Found\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 · Accounts",
+      "description": "CRUD of the account microservice (port 8082). Creating an account validates the customerId over REST against ms-customers, so 01 · Customers has to run first.",
+      "item": [
+        {
+          "name": "POST /accounts — create (SAVINGS)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountType\": \"SAVINGS\",\n  \"initialBalance\": 1000.0,\n  \"status\": true,\n  \"customerId\": \"{{customerId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "accountNumber is readOnly: the server generates it and ignores any value sent in the body. A freshly created account has availableBalance == initialBalance."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"accountNumber\", body.accountNumber);",
+                  "pm.test(\"server assigned the account number\", function () {",
+                  "    pm.expect(body.accountNumber).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"available balance starts at the initial balance\", function () {",
+                  "    pm.expect(body.availableBalance).to.eql(1000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /accounts — 404 unknown customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountType\": \"CHECKING\",\n  \"initialBalance\": 100.0,\n  \"customerId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The inter-service call answers 404, so no account is created. If ms-customers were down instead, the answer would be a 502."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error mentions the customer\", function () {",
+                  "    pm.expect(body.message).to.include(\"Customer\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /accounts/{accountNumber}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts/{{accountNumber}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountNumber}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"returns the created account\", function () {",
+                  "    pm.expect(body.accountNumber).to.eql(pm.collectionVariables.get(\"accountNumber\"));",
+                  "    pm.expect(body.accountType).to.eql(\"SAVINGS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /accounts — list by customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts?page=0&size=20&customerId={{customerId}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "customerId",
+                  "value": "{{customerId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"every row belongs to the customer\", function () {",
+                  "    body.content.forEach(function (a) {",
+                  "        pm.expect(a.customerId).to.eql(pm.collectionVariables.get(\"customerId\"));",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /accounts/{accountNumber}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts/{{accountNumber}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountNumber}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountType\": \"CHECKING\",\n  \"status\": true,\n  \"customerId\": \"{{customerId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "initialBalance is not part of the update contract: mutating it would unbalance the movement history. Editing an account never touches its available balance."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"type changed, balances intact\", function () {",
+                  "    pm.expect(body.accountType).to.eql(\"CHECKING\");",
+                  "    pm.expect(body.initialBalance).to.eql(1000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /accounts/{accountNumber}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts/{{accountNumber}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountNumber}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountType\": \"SAVINGS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"only the sent field changed\", function () {",
+                  "    pm.expect(body.accountType).to.eql(\"SAVINGS\");",
+                  "    pm.expect(body.status).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /accounts/{accountNumber} — 404 unknown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts/999999999",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "999999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404 Not Found\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 · Movements",
+      "description": "Rules F2 (a debit subtracts, a credit adds, the value must be greater than zero) and F3 (\"Saldo no disponible\"). Runs against the account created in 02.",
+      "item": [
+        {
+          "name": "POST /movements — CREDIT +500",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"{{accountNumber}}\",\n  \"movementType\": \"CREDIT\",\n  \"value\": 500.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rule F2: a credit adds to the balance. The response balance is the account balance AFTER applying the movement — a frozen historical value."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"movementId\", body.movementId);",
+                  "pm.test(\"credit added to the balance: 1000 + 500\", function () {",
+                  "    pm.expect(body.balance).to.eql(1500);",
+                  "});",
+                  "pm.test(\"server assigned id and date\", function () {",
+                  "    pm.expect(body.movementId).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(body.date).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /movements — DEBIT -200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"{{accountNumber}}\",\n  \"movementType\": \"DEBIT\",\n  \"value\": 200.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rule F2: a debit subtracts. It chains on the balance of the previous movement, not on the initial balance."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"movementId\", body.movementId);",
+                  "pm.test(\"debit subtracted from the running balance: 1500 - 200\", function () {",
+                  "    pm.expect(body.balance).to.eql(1300);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /movements — 422 Saldo no disponible",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"{{accountNumber}}\",\n  \"movementType\": \"DEBIT\",\n  \"value\": 999999.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rule F3. The message is the literal text required by the specification. The rejection leaves the database untouched: no movement row, no balance change."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 422 Unprocessable Content\", function () { pm.response.to.have.status(422); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"literal message required by the specification\", function () {",
+                  "    pm.expect(body.message).to.eql(\"Saldo no disponible\");",
+                  "});",
+                  "pm.test(\"no internal detail leaks into the body\", function () {",
+                  "    pm.expect(body.message).to.not.include(\"1300\");",
+                  "    pm.expect(body.message).to.not.include(\"999999\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /movements — 400 value must be > 0",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"{{accountNumber}}\",\n  \"movementType\": \"CREDIT\",\n  \"value\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rule F2, strict: zero is rejected too. It is a 400 and not a 422 because the request is refused without ever looking at the state of the account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400 Bad Request\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /movements/{movementId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/movements/{{movementId}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements",
+                "{{movementId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"returns the last movement created\", function () {",
+                  "    pm.expect(body.movementId).to.eql(pm.collectionVariables.get(\"movementId\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /movements — filter by customer and date range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/movements?page=0&size=20&customerId={{customerId}}&startDate=2020-01-01&endDate=2030-12-31",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "customerId",
+                  "value": "{{customerId}}"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2020-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2030-12-31"
+                }
+              ]
+            },
+            "description": "Point 5 of the specification: movements by date and by customer. The four filters are optional; the final day of the range is covered in full."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"returns the movements of the account\", function () {",
+                  "    pm.expect(body.content.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /movements — 400 inverted range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/movements?startDate=2030-12-31&endDate=2020-01-01",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2030-12-31"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2020-01-01"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400 Bad Request\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /movements/{movementId} — edit the last one",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements/{{movementId}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements",
+                "{{movementId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"movementType\": \"DEBIT\",\n  \"value\": 300.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Only the last movement of an account can be edited: every balance is historical and touching one in the middle would unbalance the chain. The edit applies the delta (new - old): -300 - (-200) = -100 over 1300."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"balance recomposed by the delta: 1300 - 100\", function () {",
+                  "    pm.expect(body.balance).to.eql(1200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /movements/{movementId}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements/{{movementId}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements",
+                "{{movementId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": 250.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The partial branch goes through the same balance door as the PUT: -250 - (-300) = +50 over 1200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"balance recomposed: 1200 + 50\", function () {",
+                  "    pm.expect(body.balance).to.eql(1250);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /movements/{movementId} — reversal",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/movements/{{movementId}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements",
+                "{{movementId}}"
+              ]
+            },
+            "description": "Deleting applies the opposite sign, returning the account to the balance it held before. Reverting a credit lowers the balance, so a delete honours F3 as well."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 204 No Content\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"no body\", function () { pm.expect(pm.response.text()).to.be.empty; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 · Reports",
+      "description": "Account statement: the only endpoint combining our own data (accounts + movements) with data fetched over REST from the customer microservice.",
+      "item": [
+        {
+          "name": "GET /reports/{client-id} — statement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/reports/{{customerId}}?startDate=2020-01-01&endDate=2030-12-31&format=json",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "reports",
+                "{{customerId}}"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2020-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2030-12-31"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                }
+              ]
+            },
+            "description": "Both dates are optional: without startDate the range starts open, without endDate it ends today. The report always states the period it covers."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"carries the customer fetched from ms-customers\", function () {",
+                  "    pm.expect(body.customer.customerId).to.eql(pm.collectionVariables.get(\"customerId\"));",
+                  "    pm.expect(body.customer.name).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"carries the accounts with their movements\", function () {",
+                  "    pm.expect(body.accounts).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(body.accounts[0]).to.have.property(\"movements\");",
+                  "});",
+                  "pm.test(\"states the effective range\", function () {",
+                  "    pm.expect(body.range.startDate).to.eql(\"2020-01-01\");",
+                  "    pm.expect(body.range.endDate).to.eql(\"2030-12-31\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reports/{client-id} — 404 unknown or without accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/reports/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "reports",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "description": "The contract folds both cases under the same 404: the customer does not exist, or it exists but has no accounts."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404 Not Found\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reports/{client-id} — 400 inverted range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/reports/{{customerId}}?startDate=2030-12-31&endDate=2020-01-01",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "reports",
+                "{{customerId}}"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2030-12-31"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2020-01-01"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400 Bad Request\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 · Teardown",
+      "description": "Leaves the database as it was found. The account can only be deleted once its balance is zero, which is the last business rule left to exercise.",
+      "item": [
+        {
+          "name": "DELETE /accounts/{accountNumber} — 409 balance not zero",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts/{{accountNumber}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountNumber}}"
+              ]
+            },
+            "description": "The account still holds money, so it cannot be deleted. It is a 409 and not a 404: the resource exists, it is its state that blocks the operation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"message explains the rule\", function () {",
+                  "    pm.expect(body.message).to.include(\"balance must be zero\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /movements — DEBIT down to zero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountsUrl}}/movements",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "movements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"{{accountNumber}}\",\n  \"movementType\": \"DEBIT\",\n  \"value\": 1500.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Exact boundary of rule F3: a NEGATIVE balance is rejected, zero is accepted."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"movementId\", body.movementId);",
+                  "pm.test(\"balance lands exactly on zero\", function () {",
+                  "    pm.expect(body.balance).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /accounts/{accountNumber} — 204",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{accountsUrl}}/accounts/{{accountNumber}}",
+              "host": [
+                "{{accountsUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountNumber}}"
+              ]
+            },
+            "description": "With a zero balance the deletion goes through. It removes the movements of the account first, explicitly, rather than relying on the database cascade."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 204 No Content\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /customers/{id} — 204",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "Deleting the customer also removes its person row (JOINED inheritance, FK ON DELETE CASCADE)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 204 No Content\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id} — 404 after deletion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customersUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{customersUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404 Not Found\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

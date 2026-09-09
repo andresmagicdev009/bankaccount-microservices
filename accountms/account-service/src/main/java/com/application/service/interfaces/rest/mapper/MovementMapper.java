@@ -15,16 +15,17 @@ import com.application.service.interfaces.rest.dto.MovementPatchDto;
 import com.application.service.interfaces.rest.dto.MovementUpdateDto;
 
 /**
- * PASO 6.2 - Frontera HTTP <-> dominio para movimientos.
+ * HTTP <-> domain boundary for movements.
  */
 @Component
 public class MovementMapper {
 
-    // ------------------------------------------------------------ entrada
+    // -------------------------------------------------------------- input
 
     /**
-     * movementId, date y balance no se mapean: son readOnly en el contrato y los
-     * asigna MovementService al aplicar el movimiento sobre el saldo.
+     * movementId, date and balance are not mapped: they are readOnly in the
+     * contract and assigned by MovementService while applying the movement to
+     * the balance.
      */
     public Movement toDomain(MovementCreateDto dto) {
         return Movement.builder()
@@ -35,10 +36,11 @@ public class MovementMapper {
     }
 
     /**
-     * PUT: solo viajan movementType y value. accountNumber, date y balance no
-     * estan en el contrato de update -mover un movimiento de cuenta o reescribir
-     * su fecha descuadraria el saldo historico-, asi que el Movement sale con
-     * esos campos en null y MovementService conserva los del existente.
+     * PUT: only movementType and value travel. accountNumber, date and balance
+     * are not in the update contract -moving a movement between accounts or
+     * rewriting its date would unbalance the historical balance-, so the
+     * Movement comes out with those fields null and MovementService keeps the
+     * ones of the existing row.
      */
     public Movement toDomain(MovementUpdateDto dto) {
         return Movement.builder()
@@ -55,7 +57,7 @@ public class MovementMapper {
         return DtoTypes.toDomainEnum(MovementType.class, movementType);
     }
 
-    /** En PATCH el null significa "conserva el valor actual". */
+    /** In a PATCH, null means "keep the current value". */
     public MovementType toDomainType(MovementPatchDto.MovementTypeEnum movementType) {
         return DtoTypes.toDomainEnum(MovementType.class, movementType);
     }
@@ -64,7 +66,7 @@ public class MovementMapper {
         return DtoTypes.toAmount(value);
     }
 
-    // ------------------------------------------------------------- salida
+    // ------------------------------------------------------------- output
 
     public MovementDto toDto(Movement movement) {
         return new MovementDto()

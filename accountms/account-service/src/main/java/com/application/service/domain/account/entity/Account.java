@@ -10,24 +10,25 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * PASO 1.2 - Modelo de dominio de la cuenta.
+ * Domain model of the account.
  *
- * Regla de oro de esta capa: NO puede importar nada de Spring, JPA, Jackson ni
- * de los DTOs generados. Es un POJO puro con las reglas del negocio.
+ * Golden rule of this layer: it may NOT import anything from Spring, JPA,
+ * Jackson or the generated DTOs. It is a plain POJO carrying the business
+ * rules.
  *
- * Los campos son los cuatro que pide el enunciado -numero, tipo, saldo inicial,
- * estado- mas el customerId que exige la separacion en microservicios y las
- * marcas de auditoria.
+ * The fields are the four the specification asks for -number, type, initial
+ * balance, status- plus the customerId required by the split into
+ * microservices and the audit marks.
  *
- * El saldo disponible NO esta aqui y no es un olvido: el enunciado lo modela
- * como el campo "saldo" de cada movimiento (el saldo resultante despues de
- * aplicarlo). El caso 5 del documento lo confirma: la cuenta 225487 conserva
- * saldo inicial 100 mientras su saldo disponible pasa a 700. Un saldo guardado
- * tambien en la cuenta seria un segundo origen de la verdad que podria quedar
- * descuadrado respecto a la tabla movement.
+ * The available balance is NOT here, and that is not an oversight: the
+ * specification models it as the "saldo" field of each movement (the resulting
+ * balance after applying it). Case 5 of the document confirms it: account
+ * 225487 keeps an initial balance of 100 while its available balance moves to
+ * 700. A balance stored on the account as well would be a second source of
+ * truth that could drift away from the movement table.
  *
- * Quien necesita el saldo disponible lo recibe aparte: AccountView en la capa
- * de aplicacion, o el mapa de AccountStatement en el reporte.
+ * Whoever needs the available balance gets it separately: AccountView in the
+ * application layer, or the AccountStatement map in the report.
  */
 @Getter
 @Setter

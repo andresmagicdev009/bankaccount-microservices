@@ -15,29 +15,25 @@ import com.application.service.interfaces.rest.dto.AccountPatchDto;
 import com.application.service.interfaces.rest.dto.AccountUpdateDto;
 
 /**
- * PASO 6.1 - Frontera HTTP <-> dominio para cuentas.
+ * HTTP <-> domain boundary for accounts.
  *
- * A un lado los DTOs generados del contrato, al otro el modelo de dominio.
- * Ninguna otra clase deberia hacer esta traduccion.
+ * On one side the DTOs generated from the contract, on the other the domain
+ * model. No other class should perform this translation.
  *
- * Mismo patron que MovementMapper: las conversiones de tipo (Double <->
- * BigDecimal, UUID <-> String, LocalDateTime -> OffsetDateTime, enums) se
- * delegan en DtoTypes.
+ * Same pattern as MovementMapper: the type conversions (Double <-> BigDecimal,
+ * UUID <-> String, LocalDateTime -> OffsetDateTime, enums) are delegated to
+ * DtoTypes.
  */
 @Component
 public class AccountMapper  {
 
-    // ----------------------------------------------------------------- ENTRADA
+    // -------------------------------------------------------------------- INPUT
 
     /**
      * AccountCreate -> Account.
      *
-     * TODO: Account.builder() con accountType (toDomainType), initialBalance
-     * (DtoTypes.toAmount), status y customerId (DtoTypes.toId, porque el
-     * contrato usa UUID y el dominio String).
-     *
-     * accountNumber, createdAt y updatedAt NO se mapean: son readOnly y los
-     * asigna AccountService / Hibernate.
+     * accountNumber, createdAt and updatedAt are NOT mapped: they are readOnly
+     * and assigned by AccountService / Hibernate.
      */
     public Account toDomain(AccountCreateDto dto) {
         return Account.builder()
@@ -49,10 +45,10 @@ public class AccountMapper  {
     }
 
     /**
-     * AccountUpdate -> Account con los campos que el PUT reemplaza.
+     * AccountUpdate -> Account with the fields the PUT replaces.
      *
-     * TODO: solo accountType, status y customerId. initialBalance queda fuera:
-     * el contrato no lo acepta en el update.
+     * Only accountType, status and customerId. initialBalance stays out: the
+     * contract does not accept it in the update.
      */
     public Account toDomain(AccountUpdateDto dto) {
         return Account.builder()
@@ -63,10 +59,10 @@ public class AccountMapper  {
     }
 
     /**
-     * Tres sobrecargas y no un solo metodo: el generador crea un enum anidado
-     * distinto por DTO y sin interfaz comun. DtoTypes.toDomainEnum acepta
-     * cualquier Enum<?>, asi que el tipo concreto se declara aqui para que el
-     * compilador siga vigilando quien llama.
+     * Three overloads and not a single method: the generator creates a
+     * different nested enum per DTO with no common interface.
+     * DtoTypes.toDomainEnum accepts any Enum<?>, so the concrete type is
+     * declared here to keep the compiler watching the callers.
      */
     public AccountType toDomainType(AccountCreateDto.AccountTypeEnum accountType) {
         return DtoTypes.toDomainEnum(AccountType.class, accountType);
@@ -76,16 +72,16 @@ public class AccountMapper  {
         return DtoTypes.toDomainEnum(AccountType.class, accountType);
     }
 
-    /** En PATCH el null significa "conserva el valor actual". */
+    /** In a PATCH, null means "keep the current value". */
     public AccountType toDomainType(AccountPatchDto.AccountTypeEnum accountType) {
         return DtoTypes.toDomainEnum(AccountType.class, accountType);
     }
 
-    // ------------------------------------------------------------------ SALIDA
+    // ------------------------------------------------------------------- OUTPUT
 
     /**
-     * Recibe AccountView y no Account porque availableBalance no vive en el
-     * dominio: lo resuelve el servicio.
+     * It takes an AccountView and not an Account because availableBalance does
+     * not live in the domain: the service resolves it.
      */
     public AccountDto toDto(AccountView view) {
         Account account = view.account();

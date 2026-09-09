@@ -11,12 +11,12 @@ import org.springframework.stereotype.Repository;
 import com.application.service.infrastructure.persistence.jpa.entity.MovementEntity;
 
 /**
- * PASO 2.4 - Repositorio Spring Data de movimientos.
+ * Spring Data repository of movements.
  *
- * Ademas de JpaRepository extiende JpaSpecificationExecutor porque el
- * GET /movements tiene 4 filtros opcionales: una @Query con ":param IS NULL OR ..."
- * se vuelve fragil con listas y fechas. Los predicados se arman en
- * MovementSpecifications solo cuando el filtro viene.
+ * Besides JpaRepository it extends JpaSpecificationExecutor because
+ * GET /movements has 4 optional filters: a @Query with ":param IS NULL OR ..."
+ * becomes brittle with lists and dates. The predicates are assembled in
+ * MovementSpecifications only when the filter actually arrives.
  */
 @Repository
 public interface JpaMovementRepository
@@ -26,11 +26,11 @@ public interface JpaMovementRepository
             String accountNumber, LocalDateTime from, LocalDateTime to);
 
     /**
-     * Ultimo movimiento de la cuenta: de el sale el saldo disponible.
+     * Last movement of the account: the available balance comes from it.
      *
-     * El desempate por movementId no es cosmetico: movement_date tiene precision
-     * de segundo, asi que dos movimientos del mismo segundo empatarian y el saldo
-     * devuelto seria no determinista.
+     * The tie-break on movementId is not cosmetic: movement_date has second
+     * precision, so two movements within the same second would tie and the
+     * returned balance would be non-deterministic.
      */
     Optional<MovementEntity> findFirstByAccountNumberOrderByDateDescMovementIdDesc(
             String accountNumber);

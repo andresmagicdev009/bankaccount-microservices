@@ -5,10 +5,10 @@ import java.net.URI;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
- * Cabecera Location de los 201.
+ * Location header of the 201 responses.
  *
- * Se construye sobre la ruta de la peticion para que incluya el base-path
- * (/api/v1) sin repetirlo en cada controller.
+ * It is built on the path of the request so it includes the base-path (/api/v1)
+ * without repeating it in every controller.
  */
 public final class ResourceLocation {
 

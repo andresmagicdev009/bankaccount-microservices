@@ -2,38 +2,48 @@ package com.application.service.it.support;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
- * Localiza schemas/BaseDatos.sql, el script que se entrega en la prueba tecnica.
+ * Locates schemas/BaseDatos.sql, the deliverable script of the technical test.
  *
- * Las pruebas de integracion corren contra ESE archivo y no contra las
- * migraciones Flyway: si el entregable y las entidades se separan, la suite
- * tiene que enterarse.
+ * The schema of the integration tests comes from that file and not from the
+ * Flyway migrations: what gets validated this way is the deliverable the
+ * reviewer is going to run. If the script and the entities drift apart,
+ * ddl-auto=validate breaks the context startup and the failure shows up in the
+ * first IT.
  *
- * La ruta se busca subiendo desde el directorio de trabajo -que es el modulo si
- * lanzas Maven aqui, y la raiz del repo si lo lanzas desde arriba- en vez de
- * escribir "../../schemas": asi funciona en los dos casos.
+ * The path is found by walking up the parents of the working directory instead
+ * of writing "../../schemas/BaseDatos.sql": the working directory changes with
+ * whoever launches the suite -Maven inside the module, the IDE at the root of
+ * the repo- and a fixed relative path only works in one of the two cases.
  */
 public final class DeliverableSchema {
 
-    /** Ruta del entregable relativa a la raiz del repositorio. */
+    /** Path of the script, relative to the root of the repository. */
     private static final String RELATIVE_PATH = "schemas/BaseDatos.sql";
 
     private DeliverableSchema() {
     }
 
+    /**
+     * @return absolute path of the script.
+     * @throws IllegalStateException if it shows up in no ancestor: without a
+     *         schema the container starts empty and the real error would be
+     *         buried in a Hibernate validation failure.
+     */
     public static Path path() {
-        Path directory = Path.of("").toAbsolutePath();
+        Path current = Paths.get("").toAbsolutePath();
 
-        while (directory != null) {
-            Path candidate = directory.resolve(RELATIVE_PATH);
+        while (current != null) {
+            Path candidate = current.resolve(RELATIVE_PATH);
             if (Files.isRegularFile(candidate)) {
                 return candidate;
             }
-            directory = directory.getParent();
+            current = current.getParent();
         }
 
         throw new IllegalStateException(
-                "No se encontro " + RELATIVE_PATH + " subiendo desde " + Path.of("").toAbsolutePath());
+                "Could not find " + RELATIVE_PATH + " walking up from " + Paths.get("").toAbsolutePath());
     }
 }

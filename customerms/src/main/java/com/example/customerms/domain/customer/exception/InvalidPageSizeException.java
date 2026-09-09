@@ -4,12 +4,12 @@ import com.example.customerms.domain.shared.exception.DomainException;
 import com.example.customerms.domain.shared.exception.ErrorType;
 
 /**
- * Ya no lleva @ResponseStatus: el status sale del ErrorType y lo aplica el
- * advice, que ademas devuelve el cuerpo Error del contrato.
+ * No @ResponseStatus any more: the status comes from the ErrorType and is
+ * applied by the advice, which also returns the Error body of the contract.
  */
-public class InvalidaPageSizeException extends DomainException {
+public class InvalidPageSizeException extends DomainException {
 
-    public InvalidaPageSizeException(Integer size, String message) {
+    public InvalidPageSizeException(Integer size, String message) {
         super(ErrorType.INVALID_INPUT, "INVALID_PAGE_SIZE",
                 message + " Invalid page size: " + size + ". Page size must be between 1 and 100.");
     }

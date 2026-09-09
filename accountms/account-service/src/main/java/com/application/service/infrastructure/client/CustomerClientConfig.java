@@ -12,18 +12,18 @@ import io.netty.channel.ChannelOption;
 import reactor.netty.http.client.HttpClient;
 
 /**
- * PASO 3.2 - WebClient apuntando al microservicio de clientes.
+ * WebClient pointing at the customer microservice.
  *
- * La URL base entra por configuracion (customers.service.url), nunca a mano:
- * en local resuelve a localhost:8081 y dentro de Docker al nombre del servicio.
+ * The base URL comes from configuration (customers.service.url), never
+ * hardcoded: locally it resolves to localhost:8081 and inside Docker to the
+ * name of the service.
  */
 @Configuration
 public class CustomerClientConfig {
 
     /**
-     * Los timeouts no son opcionales: sin ellos, un microservicio de clientes
-     * colgado deja colgado tambien a este, con los hilos del scheduler ocupados
-     * esperando para siempre.
+     * The timeouts are not optional: without them, a hung customer microservice
+     * hangs this one too, with the scheduler threads busy waiting forever.
      */
     @Bean
     public WebClient customerWebClient(

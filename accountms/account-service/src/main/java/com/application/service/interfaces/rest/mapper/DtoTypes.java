@@ -7,30 +7,31 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
- * Conversiones de tipo entre el contrato y el dominio.
+ * Type conversions between the contract and the domain.
  *
- * Existen porque el generador de OpenAPI y el modelo de dominio no coinciden en
- * cuatro tipos, y las tres clases *Mapper necesitan exactamente las mismas
- * traducciones. Centralizarlas evita triplicar la logica -y triplicar el error
- * el dia que una cambie.
+ * They exist because the OpenAPI generator and the domain model disagree on
+ * four types, and the three *Mapper classes need exactly the same translations.
+ * Centralising them avoids tripling the logic -and tripling the mistake the day
+ * one of them changes.
  *
- * Es de paquete a proposito: solo los mappers deben usarla.
+ * It is package-private on purpose: only the mappers should use it.
  */
 final class DtoTypes {
 
     private DtoTypes() {
     }
 
-    // ---------------------------------------------------------------- dinero
+    // ----------------------------------------------------------------- money
 
     /**
-     * El contrato declara los montos como number/double; el dominio usa
-     * BigDecimal porque el binario flotante no representa exacto valores como
-     * 0.10 y los saldos terminan descuadrados.
+     * The contract declares the amounts as number/double; the domain uses
+     * BigDecimal because binary floating point cannot represent values like
+     * 0.10 exactly and the balances end up unbalanced.
      *
-     * BigDecimal.valueOf(double) y NO new BigDecimal(double): el constructor
-     * copia el ruido binario completo (0.1 -> 0.1000000000000000055511151231...),
-     * mientras que valueOf pasa por Double.toString y da 0.1.
+     * BigDecimal.valueOf(double) and NOT new BigDecimal(double): the
+     * constructor copies the full binary noise
+     * (0.1 -> 0.1000000000000000055511151231...), while valueOf goes through
+     * Double.toString and yields 0.1.
      */
     static BigDecimal toAmount(Double value) {
         return value == null ? null : BigDecimal.valueOf(value);
@@ -40,9 +41,9 @@ final class DtoTypes {
         return value == null ? null : value.doubleValue();
     }
 
-    // ---------------------------------------------------------------- fechas
+    // ----------------------------------------------------------------- dates
 
-    /** La base guarda timestamps sin zona; el contrato los expone como UTC. */
+    /** The database stores timestamps without a zone; the contract exposes them as UTC. */
     static OffsetDateTime toContractDate(LocalDateTime value) {
         return value == null ? null : value.atOffset(ZoneOffset.UTC);
     }
@@ -60,17 +61,17 @@ final class DtoTypes {
     // ----------------------------------------------------------------- enums
 
     /**
-     * El generador crea un enum ANIDADO Y DISTINTO por cada DTO
-     * (AccountDto.AccountTypeEnum, AccountCreateDto.AccountTypeEnum, ...) sin
-     * interfaz comun, asi que una sobrecarga por tipo serian ocho metodos
-     * identicos. Se acepta Enum<?> y se traduce por name().
+     * The generator creates a NESTED AND DIFFERENT enum for each DTO
+     * (AccountDto.AccountTypeEnum, AccountCreateDto.AccountTypeEnum, ...) with
+     * no common interface, so one overload per type would be eight identical
+     * methods. It takes an Enum<?> and translates through name().
      *
-     * Funciona porque las constantes generadas se llaman igual que las del
-     * dominio -SAVINGS, CHECKING, DEBIT, CREDIT-, que es justamente por lo que
-     * el contrato y los enums de dominio se escribieron con los mismos nombres.
+     * It works because the generated constants are named like the domain ones
+     * -SAVINGS, CHECKING, DEBIT, CREDIT-, which is precisely why the contract
+     * and the domain enums were written with the same names.
      *
-     * El precio: el compilador acepta cualquier enum. Por eso los metodos
-     * publicos de los mappers si declaran el tipo concreto que esperan.
+     * The price: the compiler accepts any enum. That is why the public methods
+     * of the mappers do declare the concrete type they expect.
      */
     static <E extends Enum<E>> E toDomainEnum(Class<E> domainType, Enum<?> contractEnum) {
         return contractEnum == null ? null : Enum.valueOf(domainType, contractEnum.name());

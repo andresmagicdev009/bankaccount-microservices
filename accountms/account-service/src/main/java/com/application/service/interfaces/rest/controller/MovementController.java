@@ -23,21 +23,21 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * PASO 7.2 - Controller de movimientos.
+ * Movements controller.
  *
- * Mismo patron que AccountController: el trabajo bloqueante sale del event loop
- * por BlockingBridge y las reglas F2/F3 quedan enteras en MovementService.
+ * Same pattern as AccountController: the blocking work leaves the event loop
+ * through BlockingBridge and rules F2/F3 stay whole inside MovementService.
  *
- * Las rutas y los codigos de estado vienen de MovementsApi, generada del
- * contrato: aqui no hay ni un @PostMapping ni un @RequestMapping.
+ * The routes and the status codes come from MovementsApi, generated from the
+ * contract: there is not a single @PostMapping or @RequestMapping here.
  *
- * No hay try/catch. InsufficientBalanceException sube hasta
- * GlobalExceptionHandler, que la traduce a 422 con "Saldo no disponible".
- * Atraparla aqui romperia la regla F3.
+ * There is no try/catch. InsufficientBalanceException travels up to
+ * GlobalExceptionHandler, which turns it into a 422 with "Saldo no disponible".
+ * Catching it here would break rule F3.
  *
- * Conversion recurrente: el contrato declara movementId y customerId como UUID
- * y el dominio los guarda como String. La traduccion se hace en este borde,
- * nunca en el servicio.
+ * A recurring conversion: the contract declares movementId and customerId as
+ * UUIDs and the domain stores them as Strings. The translation happens at this
+ * edge, never in the service.
  */
 @RestController
 @RequiredArgsConstructor
@@ -49,14 +49,14 @@ public class MovementController implements MovementsApi {
     private final BlockingBridge blocking;
 
     /**
-     * POST /movements -> 201 con cabecera Location.
+     * POST /movements -> 201 with a Location header.
      *
-     * El body llega como Mono porque el contrato es reactivo: hasta que no se
-     * suscribe no hay DTO. De ahi el map para traducirlo y el flatMap para
-     * encadenar el trabajo bloqueante, que ya devuelve otro Mono.
+     * The body arrives as a Mono because the contract is reactive: there is no
+     * DTO until it is subscribed to. Hence the map to translate it and the
+     * flatMap to chain the blocking work, which already returns another Mono.
      */
     @Override
-    public Mono<ResponseEntity<MovementDto>> createMovement(Mono<MovementCreateDto> movementCreateDto,
+    public Mono<ResponseEntity<MovementDto>> postMovement(Mono<MovementCreateDto> movementCreateDto,
             ServerWebExchange exchange) {
         return movementCreateDto
                 .map(movementMapper::toDomain)
@@ -77,13 +77,15 @@ public class MovementController implements MovementsApi {
     /**
      * GET /movements?page&size&accountNumber&customerId&startDate&endDate.
      *
-     * Es el listado del punto 5 del enunciado: por fechas y por usuario.
+     * This is the listing of point 5 of the specification: by date and by
+     * customer.
      *
-     * Las fechas se pasan tal cual como LocalDate: el servicio las expande a
-     * LocalDateTime -toFrom/toTo-. Convertirlas aqui duplicaria esa regla.
+     * The dates are passed straight through as LocalDate: the service expands
+     * them to LocalDateTime -toFrom/toTo-. Converting them here would duplicate
+     * that rule.
      */
     @Override
-    public Mono<ResponseEntity<MovementPageDto>> listMovements(Integer page, Integer size, String accountNumber,
+    public Mono<ResponseEntity<MovementPageDto>> getMovements(Integer page, Integer size, String accountNumber,
             UUID customerId, LocalDate startDate, LocalDate endDate, ServerWebExchange exchange) {
         String customer = (customerId == null) ? null : customerId.toString();
 
@@ -93,7 +95,7 @@ public class MovementController implements MovementsApi {
     }
 
     @Override
-    public Mono<ResponseEntity<MovementDto>> updateMovement(UUID movementId, Mono<MovementUpdateDto> movementUpdateDto,
+    public Mono<ResponseEntity<MovementDto>> putMovement(UUID movementId, Mono<MovementUpdateDto> movementUpdateDto,
             ServerWebExchange exchange) {
         return movementUpdateDto
                 .map(movementMapper::toDomain)
@@ -103,9 +105,9 @@ public class MovementController implements MovementsApi {
     }
 
     /**
-     * El PATCH no pasa por un Movement: sus campos nulos significan "no cambies
-     * esto", y un Movement a medio llenar no sabria distinguir eso de un "ponlo
-     * a null". Por eso el servicio recibe los dos campos sueltos.
+     * The PATCH does not go through a Movement: its null fields mean "do not change
+     * this", and a half-filled Movement could not tell that apart from "set it to
+     * null". That is why the service receives the two fields loose.
      */
     @Override
     public Mono<ResponseEntity<MovementDto>> patchMovement(UUID movementId, Mono<MovementPatchDto> movementPatchDto,
@@ -118,7 +120,7 @@ public class MovementController implements MovementsApi {
                 .map(ResponseEntity::ok);
     }
 
-    /** delete no devuelve nada: el Mono vacio dispara el 204. */
+    /** delete returns nothing: the empty Mono triggers the 204. */
     @Override
     public Mono<ResponseEntity<Void>> deleteMovement(UUID movementId, ServerWebExchange exchange) {
         return blocking.run(() -> movementService.delete(movementId.toString()))

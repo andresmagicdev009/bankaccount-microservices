@@ -1,53 +1,55 @@
 package com.application.service.domain.shared.constant;
 
 /**
- * Codigo estable + plantilla de mensaje de cada error del dominio.
+ * Stable code + message template of every domain error.
  *
- * El code() sale del nombre de la constante, asi que nunca se repite el literal.
- * El cliente puede comparar contra ese code sin parsear el texto del mensaje.
+ * code() comes from the name of the constant, so the literal is never repeated.
+ * A client can compare against that code without parsing the message text.
  *
- * REGLA: el comentario de cada constante dice cuantos argumentos espera.
- * String.format revienta con MissingFormatArgumentException si le faltan, y el
- * compilador no puede avisarte porque format(...) recibe Object...
+ * RULE: the comment on each constant states how many arguments it expects.
+ * String.format blows up with MissingFormatArgumentException when they are
+ * missing, and the compiler cannot warn about it because format(...) takes an
+ * Object...
  */
 public enum ErrorCode {
 
-    /** args: (nombreCampo, valor) */
+    /** args: (fieldName, value) */
     ACCOUNT_NOT_FOUND("Account not found with %s : '%s'"),
-    /** args: (nombreCampo, valor) */
+    /** args: (fieldName, value) */
     MOVEMENT_NOT_FOUND("Movement not found with %s : '%s'"),
-    /** args: (nombreCampo, valor) */
+    /** args: (fieldName, value) */
     CUSTOMER_NOT_FOUND("Customer not found with %s : '%s'"),
 
     /**
-     * args: ninguno. Texto literal exigido por el enunciado (regla F3); no se
-     * traduce ni se le agregan detalles. El detalle para depurar va al log.
+     * args: none. Literal text required by the specification (rule F3); it is
+     * neither translated nor extended with details. The debugging detail goes
+     * to the log.
      */
     INSUFFICIENT_BALANCE("Saldo no disponible"),
 
-    /** args: (valorRecibido) */
+    /** args: (receivedValue) */
     INVALID_MOVEMENT_VALUE("Movement value must be greater than zero, got: %s"),
     /**
-     * args: (movementId, accountNumber). Solo el ultimo movimiento de una
-     * cuenta se puede editar o borrar: el balance de cada fila es historico y
-     * tocar uno intermedio descuadraria todos los posteriores.
+     * args: (movementId, accountNumber). Only the last movement of an account
+     * can be edited or deleted: the balance of each row is historical and
+     * touching one in the middle would unbalance every later row.
      */
     MOVEMENT_NOT_LAST("Movement %s is not the last movement of account %s; only the last one can be modified or deleted"),
 
     /** args: (accountNumber) */
     BALANCE_NOT_ZERO("Account %s cannot be deleted: its balance must be zero"),
     /**
-     * args: (accountNumber). Una cuenta inactiva sigue existiendo -por eso no es
-     * un 404-: es su estado el que no admite movimientos.
+     * args: (accountNumber). An inactive account still exists -that is why this
+     * is not a 404-: it is its state that does not accept movements.
      */
     ACCOUNT_INACTIVE("Account %s does not accept movements: it is inactive"),
     /** args: (startDate, endDate) */
     INVALID_DATE_RANGE("Start date %s must not be after end date %s"),
-    /** args: (sizeRecibido) */
+    /** args: (receivedSize) */
     INVALID_PAGE_SIZE("Page size must be between 1 and 100, got: %s"),
     /**
-     * args: ninguno. La secuencia paso del tamano del dominio: no quedan
-     * numeros de cuenta libres. No es error del cliente, sale como 500.
+     * args: none. The sequence went past the size of the domain: no free
+     * account numbers are left. It is not a client error, it goes out as a 500.
      */
     ACCOUNT_NUMBER_EXHAUSTED("Account number space is exhausted"),
 

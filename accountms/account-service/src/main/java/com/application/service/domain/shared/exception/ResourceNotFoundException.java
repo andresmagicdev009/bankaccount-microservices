@@ -3,11 +3,11 @@ package com.application.service.domain.shared.exception;
 import com.application.service.domain.shared.constant.ErrorCode;
 
 /**
- * Categoria 404 - el recurso pedido no existe.
+ * Category 404 - the requested resource does not exist.
  *
- * Es abstracta a proposito: nadie debe lanzar la categoria directamente, sino
- * una subclase con nombre propio. El advice atrapa la categoria y cubre todas
- * sus subclases (presentes y futuras) con un solo @ExceptionHandler.
+ * It is abstract on purpose: nobody should throw the category directly, always
+ * a subclass with a name of its own. The advice catches the category and covers
+ * all of its subclasses (present and future) with a single @ExceptionHandler.
  */
 public abstract class ResourceNotFoundException extends DomainException {
 
@@ -15,7 +15,7 @@ public abstract class ResourceNotFoundException extends DomainException {
         super(errorCode.code(), errorCode.format(args));
     }
 
-    /** El cause va primero: en Java los varargs tienen que cerrar la firma. */
+    /** The cause comes first: in Java the varargs have to close the signature. */
     protected ResourceNotFoundException(Throwable cause, ErrorCode errorCode, Object... args) {
         super(errorCode.code(), errorCode.format(args), cause);
     }

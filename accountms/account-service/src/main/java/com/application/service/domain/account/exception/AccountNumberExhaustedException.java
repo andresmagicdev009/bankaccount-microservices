@@ -4,14 +4,15 @@ import com.application.service.domain.shared.constant.ErrorCode;
 import com.application.service.domain.shared.exception.DomainException;
 
 /**
- * Se acabaron los numeros de cuenta del dominio.
+ * The domain ran out of account numbers.
  *
- * Cuelga de DomainException y no de ninguna de las cuatro categorias a
- * proposito: no es culpa del cliente -no hay nada que pueda corregir en su
- * peticion-, es capacidad agotada del sistema. Al no encajar en 400/404/409/422
- * la recoge el @ExceptionHandler(Exception.class) de GlobalExceptionHandler y
- * sale como 500 con el texto generico, que es justo lo que se quiere: el
- * detalle queda en el log, no en la respuesta.
+ * It hangs off DomainException and not off any of the four categories on
+ * purpose: it is not the fault of the client -there is nothing they could fix
+ * in their request-, it is exhausted system capacity. Since it fits none of
+ * 400/404/409/422, GlobalExceptionHandler picks it up with
+ * @ExceptionHandler(Exception.class) and it goes out as a 500 carrying the
+ * generic text, which is exactly what is wanted: the detail stays in the log,
+ * not in the response.
  */
 public class AccountNumberExhaustedException extends DomainException {
 

@@ -11,8 +11,8 @@ public abstract class DomainException extends RuntimeException {
     }
 
     /**
-     * Para fallas originadas en otro sistema: conserva la causa para que el
-     * stacktrace del 502 diga que fallo realmente.
+     * For failures originated in another system: keeps the cause so the stack
+     * trace of the 502 says what actually failed.
      */
     protected DomainException(String code, String message, Throwable cause) {
         super(message, cause);
