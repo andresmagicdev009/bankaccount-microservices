@@ -82,8 +82,8 @@ Compose reads the .env file at the root (created from [.env.example](.env.exampl
 |---|---|
 | `SPRING_DATASOURCE_CUSTOMER_URL` | `jdbc:mysql://db:3306/customers_ms?...` |
 | `SPRING_DATASOURCE_ACCOUNT_URL` | `jdbc:mysql://db:3306/accounts_ms?...` |
-| `SPRING_DATASOURCE_USERNAME` | `root` |
-| `SPRING_DATASOURCE_PASSWORD` | *(empty)* |
+| `SPRING_DATASOURCE_USERNAME` | `user` |
+| `SPRING_DATASOURCE_PASSWORD` | `password` |
 | `CUSTOMERS_SERVICE_URL` | `http://ms-customers:8081/api/v1` |
 
 The database container starts with `MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes`, which
