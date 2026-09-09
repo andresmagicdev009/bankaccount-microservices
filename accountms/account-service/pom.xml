@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>17</java.version>
 		<openapi-generator.version>7.11.0</openapi-generator.version>
+		<wiremock.version>3.13.2</wiremock.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -115,6 +116,14 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers-mysql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Doble del microservicio de clientes. standalone (shaded) para que su
+		     Jetty y su Jackson no choquen con los de Spring Boot. -->
+		<dependency>
+			<groupId>org.wiremock</groupId>
+			<artifactId>wiremock-standalone</artifactId>
+			<version>${wiremock.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
