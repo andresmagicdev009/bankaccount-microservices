@@ -33,7 +33,12 @@ public class CustomerRepositoryAdapter implements CustomerRepositoryPort {
                     .orElseThrow(() -> new CustomerNotFoundException(customer.getId()));
             mapper.updateEntity(entity, customer);
         }
-        return mapper.toDomain(jpaRepository.save(entity));
+        // saveAndFlush y no save: con GenerationType.UUID el id se asigna en memoria,
+        // asi que save() no toca la base y Hibernate difiere el INSERT hasta el commit.
+        // @CreationTimestamp / @UpdateTimestamp se resuelven en ese INSERT, asi que sin
+        // flush el mapeo de vuelta leeria createdAt/updatedAt todavia en null y la
+        // respuesta rompería el contrato, que los declara required.
+        return mapper.toDomain(jpaRepository.saveAndFlush(entity));
     }
 
     @Override

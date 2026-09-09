@@ -91,6 +91,10 @@ public class CustomerService {
         existing.setPhone(customer.getPhone());
         existing.setAddress(customer.getAddress());
         existing.setStatus(customer.getStatus());
+        // El PUT es un reemplazo completo y el contrato declara password como
+        // required (@NotNull en CustomerUpdateDto), asi que siempre viene: se
+        // aplica igual que el resto de campos.
+        existing.setPassword(customer.getPassword());
 
         // Save the updated customer
         Customer updated = repository.save(existing);
@@ -116,6 +120,11 @@ public class CustomerService {
         }
         if (patchDto.getStatus() != null) {
             existing.setStatus(patchDto.getStatus());
+        }
+        // password tambien es parcheable segun el contrato. Va con guarda de null
+        // como el resto: en PATCH, campo ausente significa "dejalo como esta".
+        if (patchDto.getPassword() != null) {
+            existing.setPassword(patchDto.getPassword());
         }
 
         // 3. Guardar cliente actualizado

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebInputException;
 
 import com.example.customerms.domain.shared.exception.DomainException;
@@ -111,6 +112,34 @@ public class GlobalHandlerException {
                 exchange.getRequest().getPath().value(),
                 ex.getMostSpecificCause().getMessage());
         return build(HttpStatus.CONFLICT, "Customer already exists with that identification", exchange);
+    }
+
+    // ------------------------------------------------- status del framework
+    /**
+     * Excepciones que ya traen su propio codigo HTTP: una ruta inexistente
+     * (NoResourceFoundException -> 404), un metodo no permitido (405), un
+     * Accept que no cuadra (406). Sin este handler caian en la red de
+     * seguridad de abajo y salian como 500, que le miente al cliente.
+     *
+     * ServerWebInputException tambien extiende ResponseStatusException, pero
+     * Spring despacha al handler mas especifico, asi que el 400 de arriba
+     * sigue mandando.
+     *
+     * Se responde con el reason phrase del status y no con ex.getReason(): ese
+     * texto incluye la ruta pedida y detalles internos del framework.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorDto> handleResponseStatus(ResponseStatusException ex, ServerWebExchange exchange) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        log.warn("{} {} -> {} {}",
+                exchange.getRequest().getMethod(),
+                exchange.getRequest().getPath().value(),
+                status.value(),
+                ex.getReason());
+        return build(status, status.getReasonPhrase(), exchange);
     }
 
     // ---------------------------------------------------------------- 500
